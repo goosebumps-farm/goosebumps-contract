@@ -1,0 +1,34 @@
+[
+  {
+    "type": "admin::AdminCap",
+    "id": "0x30b9e80889bb02d8cc39463fc9a17ea8f1d0ba54f6614fbcbe7d968b40502933"
+  },
+  {
+    "type": "package::Publisher",
+    "id": "0x441e45fd40ec0e82a5ee62ac61963e88464c2a25b8c3598f83678b5951a752fa"
+  },
+  {
+    "type": "coin::CoinMetadata<0xd9a2660e20403e868649631bfffbde471e0f6053ad09a9818db33b839c203c27::duck::DUCK>",
+    "id": "0x511c5062b1e7790f66ebbe1f026065963637be36a0a6d78ffa1ffc0033197b49"
+  },
+  {
+    "type": "pond::Pond",
+    "id": "0x69306b674d6904f063d1d388ca0caa4c30b5d3db871bab158125cf77aa1b5790"
+  },
+  {
+    "type": "package::UpgradeCap",
+    "id": "0x8a0e18f7c9046834dcad9007a868288c2e0c2c5b7414851acac1c0cf2884df1d"
+  },
+  {
+    "type": "display::Display<0xd9a2660e20403e868649631bfffbde471e0f6053ad09a9818db33b839c203c27::goose::Goose>",
+    "id": "0x9b25338257f6e978277b380089e1e9a9a2226fd5b7088d760877a53afe514937"
+  },
+  {
+    "type": "package",
+    "id": "0xd9a2660e20403e868649631bfffbde471e0f6053ad09a9818db33b839c203c27"
+  },
+  {
+    "type": "duck::DuckManager",
+    "id": "0xe41d5f7fdab1c0a0da087d87ec117be24ffe35ac75987e18ef997e3fdcf9ea25"
+  }
+]

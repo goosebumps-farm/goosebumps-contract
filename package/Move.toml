@@ -1,0 +1,15 @@
+[package]
+name = "goose-bumps"
+version = "0.0.0"
+# edition = "2024.alpha"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet", override = true }
+MoveStdlib = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/move-stdlib", rev = "framework/testnet", override = true }
+
+BucketProtocol = { local = "./deps/bucket-v1-core/protocol", override = true }
+BucketOracle = { git = "https://github.com/Bucket-Protocol/oracle.git", rev = "testnet", override = true  }
+
+[addresses]
+goose_bumps = "0x0"
+

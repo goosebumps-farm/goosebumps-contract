@@ -1,0 +1,24 @@
+{
+  "name": "sui-bank",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@typescript-eslint/parser": "^6.19.1",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "publish": "bun ./src/publish.ts",
+    "init": "bun ./src/init.ts",
+    "buck": "bun ./src/buck.ts",
+    "bump": "bun ./src/bump.ts",
+    "dump": "bun ./src/dump.ts",
+    "pump": "bun ./src/pump.ts",
+    "redeem": "bun ./src/redeem.ts"
+  },
+  "dependencies": {
+    "@mysten/sui.js": "^0.49.1",
+    "bun-types": "^1.0.25",
+    "dotenv": "^16.4.1"
+  }
+}
