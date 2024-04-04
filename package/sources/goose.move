@@ -58,7 +58,7 @@ module goose_bumps::goose {
             utf8(b"a cool goose out of the pond"),
             utf8(b"ipfs://{image_url}"),
             utf8(b"ipfs://{thumbnail_url}"),
-            utf8(b"https://goosebonds.io"),
+            utf8(b"https://goosebumps.farm"),
         ];
 
         let publisher = package::claim(otw, ctx);

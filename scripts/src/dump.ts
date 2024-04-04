@@ -12,7 +12,7 @@ import { client, keypair, getId } from './utils.js';
 		const [comp_req, wit_req] = tx.moveCall({
 			target: `${packageId}::pond::request_dump`,
 			arguments: [
-				tx.object("0x9f228ddc1d955c6ceddfea59fdfffe98eb9de8b71705e98a8e58a6e24689ccbe")
+				tx.object("0x184fb73b1e57e478fc811929fb976776625d929f88334f7ff2daa7fa47a4d9ef")
 			],
 			typeArguments: [],
 		});

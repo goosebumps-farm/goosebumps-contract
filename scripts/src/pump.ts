@@ -45,7 +45,7 @@ import { client, keypair, getId } from './utils.js';
 		const [duck] = tx.moveCall({
 			target: `${packageId}::pond::pump`,
 			arguments: [
-				tx.object("0x9f228ddc1d955c6ceddfea59fdfffe98eb9de8b71705e98a8e58a6e24689ccbe"),
+				tx.object("0x8b4ec24712fb1139a6107a4819b7bd7b336664a7273d3895e5149c343648c367"),
 				comp_req,
 				tx.object(getId("pond::Pond")),
 				tx.object(getId("duck::DuckManager")),

@@ -1,34 +1,34 @@
 [
   {
-    "type": "admin::AdminCap",
-    "id": "0x30b9e80889bb02d8cc39463fc9a17ea8f1d0ba54f6614fbcbe7d968b40502933"
-  },
-  {
-    "type": "package::Publisher",
-    "id": "0x441e45fd40ec0e82a5ee62ac61963e88464c2a25b8c3598f83678b5951a752fa"
-  },
-  {
-    "type": "coin::CoinMetadata<0xd9a2660e20403e868649631bfffbde471e0f6053ad09a9818db33b839c203c27::duck::DUCK>",
-    "id": "0x511c5062b1e7790f66ebbe1f026065963637be36a0a6d78ffa1ffc0033197b49"
+    "type": "display::Display<0xc2ff4ae0f4b34eebbd68a4a3f8bda1028b6f52094564145f480dd8fccc17a6d6::goose::Goose>",
+    "id": "0x2ef50671f07cee3b1e82c61fbafdfd82fdd78b85c332fe892eec5a85e941f08a"
   },
   {
     "type": "pond::Pond",
-    "id": "0x69306b674d6904f063d1d388ca0caa4c30b5d3db871bab158125cf77aa1b5790"
+    "id": "0x3246f68e012c6b2b09de171e4cdd6645594c98cc0dd0d9c926ffb6591d228956"
+  },
+  {
+    "type": "coin::CoinMetadata<0xc2ff4ae0f4b34eebbd68a4a3f8bda1028b6f52094564145f480dd8fccc17a6d6::duck::DUCK>",
+    "id": "0x3534c59e3c928bceaea1cc093b2ad63bc2f4e5bdb265aa14a4f04643d85912ba"
   },
   {
     "type": "package::UpgradeCap",
-    "id": "0x8a0e18f7c9046834dcad9007a868288c2e0c2c5b7414851acac1c0cf2884df1d"
+    "id": "0x4fe014f41148a8130211c8a4218195118ea62adc83374176faddf0f66d45022c"
   },
   {
-    "type": "display::Display<0xd9a2660e20403e868649631bfffbde471e0f6053ad09a9818db33b839c203c27::goose::Goose>",
-    "id": "0x9b25338257f6e978277b380089e1e9a9a2226fd5b7088d760877a53afe514937"
-  },
-  {
-    "type": "package",
-    "id": "0xd9a2660e20403e868649631bfffbde471e0f6053ad09a9818db33b839c203c27"
+    "type": "admin::AdminCap",
+    "id": "0x581c35754651eb94cc10d0e9532301974429eaa8f2bfe3ffb6d203d8022ba8b3"
   },
   {
     "type": "duck::DuckManager",
-    "id": "0xe41d5f7fdab1c0a0da087d87ec117be24ffe35ac75987e18ef997e3fdcf9ea25"
+    "id": "0x749a697982259c815beec18be4225fe8ed159813a4a080e3c8a824a2e8efd1a5"
+  },
+  {
+    "type": "package",
+    "id": "0xc2ff4ae0f4b34eebbd68a4a3f8bda1028b6f52094564145f480dd8fccc17a6d6"
+  },
+  {
+    "type": "package::Publisher",
+    "id": "0xcbf8810bfaa266e39f52158ff6811393855d86a617aef92408e0e27bb8f37bae"
   }
 ]
