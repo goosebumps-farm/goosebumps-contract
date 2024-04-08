@@ -4,9 +4,6 @@
 // fork of sui::vec_map allowing to retrieve the underlying vector
 
 module goose_bumps::vec_map {
-    use std::option::{Self, Option};
-    use std::vector;
-
     /// This key already exists in the map
     const EKeyAlreadyExists: u64 = 0;
 
@@ -28,12 +25,12 @@ module goose_bumps::vec_map {
     /// the convenience of programming against a map API.
     /// Large maps should use handwritten parent/child relationships instead.
     /// Maps that need sorted iteration rather than insertion order iteration should also be handwritten.
-    struct VecMap<K: copy, V> has copy, drop, store {
+    public struct VecMap<K: copy, V> has copy, drop, store {
         contents: vector<Entry<K, V>>,
     }
 
     /// An entry in the map
-    struct Entry<K: copy, V> has copy, drop, store {
+    public struct Entry<K: copy, V> has copy, drop, store {
         key: K,
         value: V,
     }
@@ -122,13 +119,13 @@ module goose_bumps::vec_map {
     /// Unpack `self` into vectors of its keys and values.
     /// The output keys and values are stored in insertion order, *not* sorted by key.
     public fun into_keys_values<K: copy, V>(self: VecMap<K, V>): (vector<K>, vector<V>) {
-        let VecMap { contents } = self;
+        let VecMap { mut contents } = self;
         // reverse the vector so the output keys and values will appear in insertion order
         vector::reverse(&mut contents);
-        let i = 0;
+        let mut i = 0;
         let n = vector::length(&contents);
-        let keys = vector::empty();
-        let values = vector::empty();
+        let mut keys = vector::empty();
+        let mut values = vector::empty();
         while (i < n) {
             let Entry { key, value } = vector::pop_back(&mut contents);
             vector::push_back(&mut keys, key);
@@ -142,9 +139,9 @@ module goose_bumps::vec_map {
     /// Returns a list of keys in the map.
     /// Do not assume any particular ordering.
     public fun keys<K: copy, V>(self: &VecMap<K, V>): vector<K> {
-        let i = 0;
+        let mut i = 0;
         let n = vector::length(&self.contents);
-        let keys = vector::empty();
+        let mut keys = vector::empty();
         while (i < n) {
             let entry = vector::borrow(&self.contents, i);
             vector::push_back(&mut keys, entry.key);
@@ -156,7 +153,7 @@ module goose_bumps::vec_map {
     /// Find the index of `key` in `self`. Return `None` if `key` is not in `self`.
     /// Note that map entries are stored in insertion order, *not* sorted by key.
     public fun get_idx_opt<K: copy, V>(self: &VecMap<K,V>, key: &K): Option<u64> {
-        let i = 0;
+        let mut i = 0;
         let n = size(self);
         while (i < n) {
             if (&vector::borrow(&self.contents, i).key == key) {

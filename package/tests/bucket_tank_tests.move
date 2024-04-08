@@ -5,12 +5,11 @@ module goose_bumps::bucket_tank_tests{
     use sui::test_utils as tu;
     use sui::clock::{Self, Clock};
     use sui::coin::{Self, Coin};
-    use sui::transfer;
     use sui::sui::SUI;
 
-    use bucket_protocol::buck::{Self, BucketProtocol, BUCK, AdminCap as BpCap};
-    use bucket_protocol::bkt::{Self, BktTreasury, BKT, BktAdminCap as BtCap};
-    use bucket_oracle::bucket_oracle::{Self, BucketOracle, AdminCap as BoCap};
+    use bucket_protocol::buck::{Self, BucketProtocol, BUCK};
+    use bucket_protocol::bkt::{Self, BktTreasury, BKT};
+    use bucket_oracle::bucket_oracle::{Self, BucketOracle};
 
     use goose_bumps::pond::{Self, Pond};
     use goose_bumps::duck::{Self, DuckManager, DUCK};
@@ -22,186 +21,180 @@ module goose_bumps::bucket_tank_tests{
 
     const OWNER: address = @0xBABE;
     const ALICE: address = @0xCAFE;
-    const BOB: address = @0xFACE;
 
-    struct Storage {
+    public struct World {
+        scenario: Scenario,
         clock: Clock,
         pond: Pond,
-        manager: DuckManager,
+        duck_manager: DuckManager,
         bp: BucketProtocol,
         bt: BktTreasury,
         bo: BucketOracle,
     }
 
     fun buck(amount: u64, scen: &mut Scenario): Coin<BUCK> {
-        coin::mint_for_testing<BUCK>(amount, ts::ctx(scen))
+        coin::mint_for_testing<BUCK>(amount, scen.ctx())
     }
 
-    fun init_scenario(): (Scenario, Storage) {
-        let scenario = ts::begin(OWNER);
+    fun start_world(): World {
+        let mut scenario = ts::begin(OWNER);
         let scen = &mut scenario;
 
         // initialize modules
-        pond::init_for_testing(ts::ctx(scen));
-        duck::init_for_testing(ts::ctx(scen));
-        goose::init_for_testing(ts::ctx(scen));
+        pond::init_for_testing(scen.ctx());
+        duck::init_for_testing(scen.ctx());
+        goose::init_for_testing(scen.ctx());
         
-        let clock = clock::create_for_testing(ts::ctx(scen));
-        clock::share_for_testing(clock);
-        buck::share_for_testing(tu::create_one_time_witness<BUCK>(), OWNER, ts::ctx(scen));
-        bkt::share_for_testing(tu::create_one_time_witness<BKT>(), OWNER, ts::ctx(scen));
-        bucket_oracle::share_for_testing<SUI>(9, OWNER, ts::ctx(scen));
+        let clock = clock::create_for_testing(scen.ctx());
+        clock.share_for_testing();
+        buck::share_for_testing(tu::create_one_time_witness<BUCK>(), OWNER, scen.ctx());
+        bkt::share_for_testing(tu::create_one_time_witness<BKT>(), OWNER, scen.ctx());
+        bucket_oracle::share_for_testing<SUI>(9, OWNER, scen.ctx());
 
-        ts::next_tx(scen, OWNER);
+        scen.next_tx(OWNER);
 
-        // get shared objects for storage
-        let clock = ts::take_shared<Clock>(scen);
-        let manager = ts::take_shared<DuckManager>(scen);
-        let pond = ts::take_shared<Pond>(scen);
-        let bp = ts::take_shared<BucketProtocol>(scen);
-        let bt = ts::take_shared<BktTreasury>(scen);
-        let bo = ts::take_shared<BucketOracle>(scen);
+        // get shared objects for world
+        let clock = scen.take_shared<Clock>();
+        let mut duck_manager = scen.take_shared<DuckManager>();
+        let mut pond = scen.take_shared<Pond>();
+        let mut bp = scen.take_shared<BucketProtocol>();
+        let bt = scen.take_shared<BktTreasury>();
+        let bo = scen.take_shared<BucketOracle>();
 
         // init shared objects
-        let coin = buck(1, scen);
-        bucket_tank::init_strategy_for_testing(&mut pond, &mut bp, coin, ts::ctx(scen));
-        duck::init_manager_for_testing(&mut manager, &clock, 0, 0, 0, 0); // TODO see if necessary
+        bucket_tank::init_strategy_for_testing(&mut pond, &mut bp, buck(1, scen), scen.ctx());
+        duck_manager.init_manager_for_testing(&clock, 0, 0, 0, 0); // TODO see if necessary
 
-        (scenario, Storage {pond, bp, bo, clock, bt, manager})
+        World {scenario, pond, bp, bo, clock, bt, duck_manager}
     }
 
-    fun forward_scenario(scen: &mut Scenario, storage: Storage, user: address): Storage {
-        let Storage { pond, bp, bo, clock, bt, manager } = storage;
+    // fun forward_scenario(scen: &mut Scenario, world: World, user: address): World {
+    //     let World { pond, bp, bo, clock, bt, duck_manager } = world;
 
-        ts::return_shared(clock);
+    //     ts::return_shared(clock);
+    //     ts::return_shared(pond);
+    //     ts::return_shared(duck_manager);
+    //     ts::return_shared(bp);
+    //     ts::return_shared(bt);
+    //     ts::return_shared(bo);
+
+    //     scen.next_tx(user);
+
+    //     let clock = scen.take_shared<Clock>();
+    //     let mut duck_manager = scen.take_shared<DuckManager>();
+    //     let mut pond = scen.take_shared<Pond>();
+    //     let mut bp = scen.take_shared<BucketProtocol>();
+    //     let bt = scen.take_shared<BktTreasury>();
+    //     let bo = scen.take_shared<BucketOracle>();
+
+    //     World {pond, bp, bo, clock, bt, duck_manager}
+    // }
+
+    fun end_world(world: World) {
+        let World { scenario, pond, bp, bo, clock, bt, duck_manager } = world;
+
+        clock.destroy_for_testing();
         ts::return_shared(pond);
-        ts::return_shared(manager);
-        ts::return_shared(bp);
-        ts::return_shared(bt);
-        ts::return_shared(bo);
-
-        ts::next_tx(scen, user);
-
-        let clock = ts::take_shared<Clock>(scen);
-        let manager = ts::take_shared<DuckManager>(scen);
-        let pond = ts::take_shared<Pond>(scen);
-        let bp = ts::take_shared<BucketProtocol>(scen);
-        let bt = ts::take_shared<BktTreasury>(scen);
-        let bo = ts::take_shared<BucketOracle>(scen);
-
-        Storage {pond, bp, bo, clock, bt, manager}
-    }
-
-    fun complete_scenario(scenario: Scenario, storage: Storage) {
-        let Storage { pond, bp, bo, clock, bt, manager } = storage;
-
-        clock::destroy_for_testing(clock);
-        ts::return_shared(pond);
-        ts::return_shared(manager);
+        ts::return_shared(duck_manager);
         ts::return_shared(bp);
         ts::return_shared(bt);
         ts::return_shared(bo);
         
-        ts::end(scenario);
+        scenario.end();
     }
 
-    fun create_egg(scen: &mut Scenario, stor: &mut Storage, amount: u64): Goose {
+    fun create_egg(world: &mut World, amount: u64): Goose {
         // create egg: init request
-        let (comp_req, dep_req) = pond::request_bump(buck(amount, scen));
+        let (mut comp_req, mut dep_req) = pond::request_bump(buck(amount, &mut world.scenario));
         // deposit in bucket_tank integration
         bucket_tank::deposit(
-            &mut stor.pond,
+            &mut world.pond,
             &mut comp_req,
             &mut dep_req,
-            &mut stor.bp,
-            &stor.bo,
-            &mut stor.bt,
-            &stor.clock,
-            ts::ctx(scen)
+            &mut world.bp,
+            &world.bo,
+            &mut world.bt,
+            &world.clock,
+            world.scenario.ctx()
         );
         // create egg: confirm request
-        pond::bump(
-            &stor.clock, 
+        world.pond.bump(
+            &world.clock, 
             comp_req, 
             dep_req, 
-            &mut stor.pond, 
-            ts::ctx(scen)
+            world.scenario.ctx()
         )
     }
 
-    fun dump_egg(scen: &mut Scenario, stor: &mut Storage, egg: &mut Goose): Coin<BUCK> {
-        let (comp_req, wit_req) = pond::request_dump(egg, ts::ctx(scen));
+    fun dump_egg(world: &mut World, egg: &mut Goose): Coin<BUCK> {
+        let (mut comp_req, mut wit_req) = pond::request_dump(egg, world.scenario.ctx());
         bucket_tank::withdraw(
-            &mut stor.pond, 
+            &mut world.pond, 
             &mut comp_req,
             &mut wit_req,
-            &mut stor.bp,
-            &stor.bo,
-            &mut stor.bt,
-            &stor.clock,
-            ts::ctx(scen)
+            &mut world.bp,
+            &world.bo,
+            &mut world.bt,
+            &world.clock,
+            world.scenario.ctx()
         );
-        pond::dump(
+        world.pond.dump(
             comp_req, 
             wit_req, 
-            &mut stor.pond, 
-            ts::ctx(scen)
+            world.scenario.ctx()
         )
     }
 
-    fun pump_egg(scen: &mut Scenario, stor: &mut Storage, egg: &mut Goose): Coin<DUCK> {
-        let comp_req = pond::request_compound();
+    fun pump_egg(world: &mut World, egg: &mut Goose): Coin<DUCK> {
+        let mut comp_req = pond::request_compound();
         bucket_tank::compound(
-            &mut stor.pond, 
+            &mut world.pond, 
             &mut comp_req,
-            &mut stor.bp,
-            &stor.bo,
-            &mut stor.bt,
-            &stor.clock,
-            ts::ctx(scen)
+            &mut world.bp,
+            &world.bo,
+            &mut world.bt,
+            &world.clock,
+            world.scenario.ctx()
         );
-        pond::pump(
+        world.pond.pump(
+            &mut world.duck_manager,
+            &world.clock, 
             egg,
             comp_req, 
-            &mut stor.pond,
-            &mut stor.manager,
-            &stor.clock, 
-            ts::ctx(scen)
+            world.scenario.ctx()
         )
     }
 
-    fun redeem_duck(scen: &mut Scenario, stor: &mut Storage, duck: Coin<DUCK>): Coin<BUCK> {
-        let comp_req = pond::request_compound();
+    fun redeem_duck(world: &mut World, duck: Coin<DUCK>): Coin<BUCK> {
+        let mut comp_req = pond::request_compound();
         bucket_tank::compound(
-            &mut stor.pond, 
+            &mut world.pond, 
             &mut comp_req,
-            &mut stor.bp,
-            &stor.bo,
-            &mut stor.bt,
-            &stor.clock,
-            ts::ctx(scen)
+            &mut world.bp,
+            &world.bo,
+            &mut world.bt,
+            &world.clock,
+            world.scenario.ctx()
         );
-        let (comp_req, wit_req) = pond::request_redeem(
+        let (mut comp_req, mut wit_req) = world.pond.request_redeem(
+            &mut world.duck_manager,
             duck,
             comp_req, 
-            &mut stor.pond,
-            &mut stor.manager,
         );
         bucket_tank::withdraw(
-            &mut stor.pond, 
+            &mut world.pond, 
             &mut comp_req,
             &mut wit_req,
-            &mut stor.bp,
-            &stor.bo,
-            &mut stor.bt,
-            &stor.clock,
-            ts::ctx(scen)
+            &mut world.bp,
+            &world.bo,
+            &mut world.bt,
+            &world.clock,
+            world.scenario.ctx()
         );
-        pond::redeem(
+        world.pond.redeem(
             comp_req,
             wit_req,
-            &mut stor.pond,
-            ts::ctx(scen),
+            world.scenario.ctx(),
         )
     }
 
@@ -213,93 +206,93 @@ module goose_bumps::bucket_tank_tests{
 
     #[test]
     fun publish_package() {
-        let (scenario, storage) = init_scenario();
-        complete_scenario(scenario, storage);
+        let world = start_world();
+        end_world(world);
     }
 
     #[test]
     fun goose_bumps_normal() {
-        let (scenario, storage) = init_scenario();
-        let egg = create_egg(&mut scenario, &mut storage, 10);
+        let mut world = start_world();
+        let mut egg = create_egg(&mut world, 10);
 
-        pond::assert_pond_data(&storage.pond, 10, 0, 1, 0, 1);
-        pond::assert_strategy_data(&storage.pond, b"bucket_tank", 1, 11);
+        world.pond.assert_pond_data(10, 0, 1, 0, 1);
+        world.pond.assert_strategy_data(b"bucket_tank", 1, 11);
         pond::assert_deposit_data(&mut egg, 10, 0);
 
         transfer::public_transfer(egg, ALICE);
-        complete_scenario(scenario, storage);
+        end_world(world);
     }
 
     #[test]
     fun goose_bumps_dumps_normal() {
-        let (scenario, storage) = init_scenario();
+        let mut world = start_world();
         // goose bumps
-        let egg = create_egg(&mut scenario, &mut storage, 10);
+        let mut egg = create_egg(&mut world, 10);
         // goose dumps
-        let buck = dump_egg(&mut scenario, &mut storage, &mut egg);
+        let buck = dump_egg(&mut world, &mut egg);
 
         tu::assert_eq(coin::value(&buck), 10);
-        pond::assert_pond_data(&storage.pond, 0, 0, 1, 0, 1);
-        pond::assert_strategy_data(&storage.pond, b"bucket_tank", 1, 1);
+        world.pond.assert_pond_data(0, 0, 1, 0, 1);
+        world.pond.assert_strategy_data(b"bucket_tank", 1, 1);
         pond::assert_no_deposit(&mut egg);
 
         transfer::public_transfer(egg, ALICE);
         transfer::public_transfer(buck, ALICE);
-        complete_scenario(scenario, storage);
+        end_world(world);
     }
 
     #[test]
     fun goose_bumps_pumps_same_timestamp_no_duck() {
-        let (scenario, storage) = init_scenario();
+        let mut world = start_world();
         // goose bumps
-        let egg = create_egg(&mut scenario, &mut storage, 1000);
+        let mut egg = create_egg(&mut world, 1000);
         // goose pumps
-        let duck = pump_egg(&mut scenario, &mut storage, &mut egg);
+        let duck = pump_egg(&mut world, &mut egg);
 
-        tu::assert_eq(coin::value(&duck), 0);
-        pond::assert_pond_data(&storage.pond, 0, 950, 46, 5, 1);
-        pond::assert_strategy_data(&storage.pond, b"bucket_tank", 1, 1001);
+        tu::assert_eq(duck.value(), 0);
+        world.pond.assert_pond_data(0, 950, 46, 5, 1);
+        world.pond.assert_strategy_data(b"bucket_tank", 1, 1001);
         pond::assert_no_deposit(&mut egg);
 
         transfer::public_transfer(egg, ALICE);
         transfer::public_transfer(duck, ALICE);
-        complete_scenario(scenario, storage);
+        end_world(world);
     }
 
     #[test]
     fun goose_bumps_pumps_get_duck() {
-        let (scenario, storage) = init_scenario();
+        let mut world = start_world();
         // goose bumps
-        let egg = create_egg(&mut scenario, &mut storage, 1000);
+        let mut egg = create_egg(&mut world, 1000);
         // goose pumps
-        clock::increment_for_testing(&mut storage.clock, 10);
-        let duck = pump_egg(&mut scenario, &mut storage, &mut egg);
-        tu::assert_eq(coin::value(&duck), 949); // with accrual_param = 1000000
-        pond::assert_pond_data(&storage.pond, 0, 950, 46, 5, 1);
-        pond::assert_strategy_data(&storage.pond, b"bucket_tank", 1, 1001);
+        world.clock.increment_for_testing(10);
+        let duck = pump_egg(&mut world, &mut egg);
+        tu::assert_eq(duck.value(), 949); // with accrual_param = 1000000
+        world.pond.assert_pond_data(0, 950, 46, 5, 1);
+        world.pond.assert_strategy_data(b"bucket_tank", 1, 1001);
         pond::assert_no_deposit(&mut egg);
 
         transfer::public_transfer(egg, ALICE);
         transfer::public_transfer(duck, ALICE);
-        complete_scenario(scenario, storage);
+        end_world(world);
     }
 
     #[test]
     fun goose_bumps_pumps_redeem_one_sec() {
-        let (scenario, storage) = init_scenario();
+        let mut world = start_world();
         let amount = 1_000_000_000;
         // goose bumps
-        let egg = create_egg(&mut scenario, &mut storage, amount);
+        let mut egg = create_egg(&mut world, amount);
         // goose pumps
-        clock::increment_for_testing(&mut storage.clock, 1000);
-        let duck = pump_egg(&mut scenario, &mut storage, &mut egg);
+        clock::increment_for_testing(&mut world.clock, 1000);
+        let duck = pump_egg(&mut world, &mut egg);
         // redeem
-        clock::increment_for_testing(&mut storage.clock, 1000);
-        let buck = redeem_duck(&mut scenario, &mut storage, duck);
+        clock::increment_for_testing(&mut world.clock, 1000);
+        let buck = redeem_duck(&mut world, duck);
 
         tu::assert_eq(coin::value(&buck), amount - pump_fee(amount));
         pond::assert_pond_data(
-            &storage.pond, 
+            &world.pond, 
             0, 
             0, 
             pump_fee(amount) - (pump_fee(amount) / 10) + 1, // + init_strat 
@@ -307,7 +300,7 @@ module goose_bumps::bucket_tank_tests{
             1
         );
         pond::assert_strategy_data(
-            &storage.pond, 
+            &world.pond, 
             b"bucket_tank", 
             1, 
             50000001 // + init_strat
@@ -316,7 +309,7 @@ module goose_bumps::bucket_tank_tests{
 
         transfer::public_transfer(egg, ALICE);
         transfer::public_transfer(buck, ALICE);
-        complete_scenario(scenario, storage);
+        end_world(world);
     }
 
 }

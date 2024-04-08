@@ -1,12 +1,9 @@
 // TBD if useful for emergency 
-module goose_bumps::admin { 
-    use sui::transfer;
-    use sui::object::{Self, UID};
-    use sui::tx_context::{Self, TxContext};
+module goose_bumps::admin {
 
     // TODO: group all cap objects under shared Manager object
 
-    struct AdminCap has key, store {
+    public struct AdminCap has key, store {
         id: UID
     }
 

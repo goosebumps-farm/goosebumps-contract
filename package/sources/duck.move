@@ -1,22 +1,16 @@
 module goose_bumps::duck {
-    use std::option;
     use std::string;
     use std::ascii;
 
     use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
-    use sui::transfer;
-    use sui::tx_context::TxContext;
     use sui::url;
-    use sui::object::{Self, UID};
-    use sui::clock::{Self, Clock};
+    use sui::clock::Clock;
 
     use goose_bumps::math64;
 
-    friend goose_bumps::pond;
+    public struct DUCK has drop {}
 
-    struct DUCK has drop {}
-
-    struct DuckManager has key {
+    public struct DuckManager has key {
         id: UID,
         cap: TreasuryCap<DUCK>,
         reserve: u64,
@@ -30,6 +24,7 @@ module goose_bumps::duck {
         accrual_param: u64,
     } 
 
+    #[allow(lint(share_owned))]
     fun init(
         otw: DUCK, 
         ctx: &mut TxContext
@@ -71,7 +66,7 @@ module goose_bumps::duck {
         adjustment_mul: u64,
         min_accrual_param: u64,
     ) {
-        manager.publish_timestamp = clock::timestamp_ms(clock);
+        manager.publish_timestamp = clock.timestamp_ms();
         manager.target_average_age = target_average_age;
         manager.adjustment_period_ms = adjustment_period_ms;
         manager.adjustment_mul = adjustment_mul;
@@ -80,38 +75,38 @@ module goose_bumps::duck {
 
     // === Friend functions ===
 
-    public(friend) fun supply(
+    public(package) fun supply(
         manager: &DuckManager
     ): u64 {
-        coin::total_supply(&manager.cap)
+        manager.cap.total_supply()
     }
 
-    public(friend) fun cap(
+    public(package) fun cap(
         manager: &mut DuckManager
     ): &mut TreasuryCap<DUCK> {
         &mut manager.cap
     }
 
-    public(friend) fun mint(
+    public(package) fun mint(
         treasury_cap: &mut TreasuryCap<DUCK>, 
         amount: u64, ctx: &mut TxContext
     ): Coin<DUCK> {
-        coin::mint(treasury_cap, amount, ctx)
+        treasury_cap.mint(amount, ctx)
     }
 
-    public(friend) fun burn(
+    public(package) fun burn(
         treasury_cap: &mut TreasuryCap<DUCK>, 
         coin: Coin<DUCK>
     ) {
-        coin::burn(treasury_cap, coin);
+        treasury_cap.burn(coin);
     }
 
-    public(friend) fun current_period(manager: &DuckManager, clock: &Clock): u64 {
-        let duration = clock::timestamp_ms(clock) - manager.publish_timestamp;
+    public(package) fun current_period(manager: &DuckManager, clock: &Clock): u64 {
+        let duration = clock.timestamp_ms() - manager.publish_timestamp;
         duration / manager.adjustment_period_ms
     }
 
-    public(friend) fun handle_accrual_param(manager: &mut DuckManager, clock: &Clock): u64 {
+    public(package) fun handle_accrual_param(manager: &mut DuckManager, clock: &Clock): u64 {
         // accrual param can't go lower than minimum
         if (manager.accrual_param == manager.min_accrual_param) return manager.accrual_param;
         
@@ -145,34 +140,31 @@ module goose_bumps::duck {
         metadata: &mut CoinMetadata<DUCK>, 
         name: string::String
     ) {
-        coin::update_name(&manager.cap, metadata, name);
+        manager.cap.update_name(metadata, name);
     }
     entry fun update_symbol(
         manager: &DuckManager, 
         metadata: &mut CoinMetadata<DUCK>, 
         name: ascii::String
     ) {
-        coin::update_symbol(&manager.cap, metadata, name);
+        manager.cap.update_symbol(metadata, name);
     }
     entry fun update_description(
         manager: &DuckManager, 
         metadata: &mut CoinMetadata<DUCK>, 
         name: string::String
     ) {
-        coin::update_description(&manager.cap, metadata, name);
+        manager.cap.update_description(metadata, name);
     }
     entry fun update_icon_url(
         manager: &DuckManager, 
         metadata: &mut CoinMetadata<DUCK>, 
         name: ascii::String
     ) {
-        coin::update_icon_url(&manager.cap, metadata, name);
+        manager.cap.update_icon_url(metadata, name);
     }
 
     // === Test functions ===
-
-    #[test_only]
-    friend goose_bumps::bucket_tank_tests;
 
     #[test_only]
     public fun init_for_testing(ctx: &mut TxContext) {

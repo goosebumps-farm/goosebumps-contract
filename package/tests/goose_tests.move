@@ -3,7 +3,6 @@ module goose_bumps::goose_tests {
     use std::string;
 
     use sui::test_scenario as ts;
-    use sui::transfer;
 
     use goose_bumps::goose::{init_for_testing, create, update, destroy, name, status, Goose};
 
@@ -17,7 +16,7 @@ module goose_bumps::goose_tests {
         let final_owner = @0xFACE;
 
         // Module initialization for emulating transactions
-        let scenario_val = ts::begin(admin);
+        let mut scenario_val = ts::begin(admin);
         let scenario = &mut scenario_val;
         {
             init_for_testing(ts::ctx(scenario));
@@ -46,7 +45,7 @@ module goose_bumps::goose_tests {
         ts::next_tx(scenario, initial_owner);
         {
             // Get the goose owned by initial owner
-            let goose_nft = ts::take_from_sender<Goose>(scenario);
+            let mut goose_nft = ts::take_from_sender<Goose>(scenario);
 
             // Perform the update of the goose with new values
             update(

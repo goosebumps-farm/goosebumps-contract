@@ -1,18 +1,11 @@
 module goose_bumps::pond {
     // === Imports ===
-    use std::debug::print;
-    use std::type_name::{Self, TypeName};
-    use std::vector;
+    use std::type_name::{Self};
     use std::ascii::{Self, String};
 
-    use sui::object::{Self, UID};
-    use sui::coin::{Self, Coin, TreasuryCap};
-    use sui::balance::{Self, Supply, Balance};
-    use sui::sui::SUI;
-    use sui::transfer;
-    use sui::clock::{Self, Clock};
-    use sui::event;
-    use sui::tx_context::TxContext;
+    use sui::coin::{Self, Coin};
+    use sui::balance::{Self, Balance};
+    use sui::clock::Clock;
     use sui::vec_set::{Self, VecSet};
     use sui::dynamic_field as df;
     use sui::dynamic_object_field as dof;
@@ -22,8 +15,7 @@ module goose_bumps::pond {
     use goose_bumps::math64;
     use goose_bumps::vec_map::{Self, VecMap};
     use goose_bumps::goose::{Self, Goose};
-    use goose_bumps::duck::{Self, DuckManager, DUCK};
-    use goose_bumps::admin::AdminCap;
+    use goose_bumps::duck::{DuckManager, DUCK};
 
     // === Constants ===
 
@@ -34,8 +26,6 @@ module goose_bumps::pond {
 
     // === Errors ===
 
-    const ENotBuck: u64 = 0;
-    const EDifferentPackage: u64 = 1;
     const EStrategyAlreadyImplemented: u64 = 2;
     const EStrategyDoesntExist: u64 = 3;
     const EPositionAlreadyStored: u64 = 4;
@@ -47,19 +37,19 @@ module goose_bumps::pond {
     // === Structs ===
 
     // helper to get package id
-    struct Package has copy, drop, store {}
+    public struct Package has copy, drop, store {}
     // key to add the pending ContributorToken as a DOF
-    struct PositionKey has drop, copy, store {}
+    public struct PositionKey has drop, copy, store {}
     // key to add the pond struct as a DF to nft
-    struct DepositKey has drop, copy, store {}
+    public struct DepositKey has drop, copy, store {}
 
-    struct Deposit has store {
+    public struct Deposit has store {
         amount: u64,
         timestamp: u64,
     }
 
     // hot potato
-    struct DepositRequest {
+    public struct DepositRequest {
         // deposit amount (immutable)
         amount: u64,
         // user deposit
@@ -67,7 +57,7 @@ module goose_bumps::pond {
     }
 
     // hot potato
-    struct WithdrawalRequest {
+    public struct WithdrawalRequest {
         // previous user deposit
         amount: u64,
         // returned balance
@@ -75,14 +65,14 @@ module goose_bumps::pond {
     }
 
     // hot potato
-    struct CompoundRequest {
+    public struct CompoundRequest {
         // total buck amount managed by the protocol
         total_buck: u64,
         // modules that have been called
         receipts: VecSet<String>,
     }
 
-    struct Pond has key {
+    public struct Pond has key {
         id: UID,
         version: u64,
         // pending or bonding amount 
@@ -99,7 +89,7 @@ module goose_bumps::pond {
         strategies: VecMap<String, Strategy>,
     }
 
-    struct Strategy has key, store {
+    public struct Strategy has key, store {
         id: UID,
         // shares of funds that should be directed to this protocol
         shares: u64,
@@ -133,9 +123,9 @@ module goose_bumps::pond {
     public fun request_bump(
         coin: Coin<BUCK>
     ): (CompoundRequest, DepositRequest) {
-        let amount = coin::value(&coin); 
+        let amount = coin.value(); 
         assert!(amount > 0, EZeroCoin);
-        let balance = coin::into_balance(coin);
+        let balance = coin.into_balance();
 
         (
             CompoundRequest { total_buck: 0, receipts: vec_set::empty() },
@@ -145,10 +135,10 @@ module goose_bumps::pond {
 
     // create egg: validate request
     public fun bump(
+        pond: &mut Pond,
         clock: &Clock, 
         comp_req: CompoundRequest, 
         dep_req: DepositRequest, 
-        pond: &mut Pond,
         ctx: &mut TxContext,
     ): Goose {
         let CompoundRequest { total_buck: _, receipts } = comp_req;
@@ -156,7 +146,7 @@ module goose_bumps::pond {
         
         pond.pending = pond.pending + amount;
 
-        let nft = goose::create(
+        let mut nft = goose::create(
             b"Egg",
             b"hi-res",
             b"lo-res",
@@ -165,13 +155,12 @@ module goose_bumps::pond {
         );
         // add egg info
         df::add(
-            goose::uid_mut(&mut nft), 
+            nft.uid_mut(), 
             DepositKey {}, 
-            Deposit { amount, timestamp: clock::timestamp_ms(clock) }
+            Deposit { amount, timestamp: clock.timestamp_ms() }
         );
 
-        balance::destroy_zero(balance);
-
+        balance.destroy_zero();
         assert_receipts_match(pond, &receipts);
 
         nft
@@ -182,12 +171,11 @@ module goose_bumps::pond {
         nft: &mut Goose, 
         ctx: &mut TxContext
     ): (CompoundRequest, WithdrawalRequest) {
-        assert!(goose::status(nft) == 1, ENotEgg);
+        assert!(nft.status() == 1, ENotEgg);
         
-        let Deposit { amount, timestamp: _ } = df::remove(goose::uid_mut(nft), DepositKey {});
+        let Deposit { amount, timestamp: _ } = df::remove(nft.uid_mut(), DepositKey {});
         
-        goose::update(
-            nft,
+        nft.update(
             b"Dumped Goose",
             b"goose_dumps_hi_res",
             b"goose_dumps_lo_res",
@@ -203,9 +191,9 @@ module goose_bumps::pond {
 
     // dump goose: validate request
     public fun dump(
+        pond: &mut Pond, 
         comp_req: CompoundRequest, 
         wit_req: WithdrawalRequest, 
-        pond: &mut Pond, 
         ctx: &mut TxContext
     ): Coin<BUCK> {
         let CompoundRequest { total_buck: _, receipts } = comp_req;
@@ -224,19 +212,18 @@ module goose_bumps::pond {
 
     // pump goose: validate request
     public fun pump(
+        pond: &mut Pond, 
+        duck_manager: &mut DuckManager, 
+        clock: &Clock,
         nft: &mut Goose, 
         comp_req: CompoundRequest,
-        pond: &mut Pond, 
-        manager: &mut DuckManager, 
-        clock: &Clock,
         ctx: &mut TxContext
     ): Coin<DUCK> {
-        assert!(goose::status(nft) == 1, ENotEgg);
+        assert!(nft.status() == 1, ENotEgg);
         
-        let Deposit { amount, timestamp } = df::remove(goose::uid_mut(nft), DepositKey {});
+        let Deposit { amount, timestamp } = df::remove(nft.uid_mut(), DepositKey {});
         
-        goose::update(
-            nft,
+        nft.update(
             b"Pumped Goose",
             b"goose_bumps_hi_res",
             b"goose_bumps_lo_res",
@@ -247,7 +234,7 @@ module goose_bumps::pond {
         let CompoundRequest { total_buck, receipts } = comp_req;     
         compound_buckets(pond, total_buck);
         // TODO: test accrual_param
-        // let accrual_param = duck::handle_accrual_param(manager, clock);
+        // let accrual_param = duck::handle_accrual_param(duck_manager, clock);
         let accrual_param = 1000000;
 
         let fee = amount * PUMP_FEE / MUL;
@@ -255,8 +242,8 @@ module goose_bumps::pond {
         let permanent_amount = fee - treasury_amount;
         let user_amount = amount - fee;
 
-        let egg_age = (clock::timestamp_ms(clock) - timestamp) * MUL;
-        let ratio = reserve_buck_supply_duck_ratio(pond, manager);
+        let egg_age = (clock.timestamp_ms() - timestamp) * MUL;
+        let ratio = reserve_buck_supply_duck_ratio(pond, duck_manager);
         let accrued_duck = MUL * math64::mul_div_down(
             user_amount, 
             egg_age, 
@@ -269,23 +256,23 @@ module goose_bumps::pond {
         pond.reserve = pond.reserve + user_amount;
         pond.permanent = pond.permanent + permanent_amount;
         pond.treasury = pond.treasury + treasury_amount;
-        duck::mint(duck::cap(manager), accrued_duck, ctx)
+        duck_manager.cap().mint(accrued_duck, ctx)
     }
     
     // need to call request_compound first
     // redeem duck: compound to get ratio
     public fun request_redeem(
+        pond: &mut Pond, 
+        duck_manager: &mut DuckManager, 
         coin: Coin<DUCK>, 
         comp_req: CompoundRequest,
-        pond: &mut Pond, 
-        manager: &mut DuckManager, 
     ): (CompoundRequest, WithdrawalRequest) {
         let CompoundRequest { total_buck, receipts } = comp_req;
         assert_receipts_match(pond, &receipts);
 
         compound_buckets(pond, total_buck);
-        let amount = coin::value(&coin) * pond.reserve / duck::supply(manager);
-        duck::burn(duck::cap(manager), coin);
+        let amount = coin.value() * pond.reserve / duck_manager.supply();
+        duck_manager.cap().burn(coin);
 
         (
             CompoundRequest { total_buck: 0, receipts: vec_set::empty() },
@@ -295,9 +282,9 @@ module goose_bumps::pond {
 
     // redeem duck: withdraw buck
     public fun redeem(
+        pond: &mut Pond, 
         comp_req: CompoundRequest,
         wit_req: WithdrawalRequest,
-        pond: &mut Pond, 
         ctx: &mut TxContext
     ): Coin<BUCK> {
         let CompoundRequest { total_buck: _, receipts } = comp_req;
@@ -311,8 +298,7 @@ module goose_bumps::pond {
 
     // === Public-Friend Functions ===
 
-    // TODO: add public(package)
-    public fun new_strategy(
+    public(package) fun new_strategy(
         ctx: &mut TxContext,
     ): Strategy {
         Strategy {
@@ -322,31 +308,29 @@ module goose_bumps::pond {
         }
     }
 
-    public fun increase_strategy_amount(
-        amount: u64,
+    public(package) fun increase_strategy_amount(
         strategy: &mut Strategy,
+        amount: u64,
     ) {
         strategy.amount = strategy.amount + amount;
     }
 
-    public fun decrease_strategy_amount(
-        amount: u64,
+    public(package) fun decrease_strategy_amount(
         strategy: &mut Strategy,
+        amount: u64,
     ) {
         strategy.amount = strategy.amount - amount;
     }
 
-    // TODO: add public(package)
-    public fun add_strategy<Witness: drop>(
+    public(package) fun add_strategy<Witness: drop>(
+        pond: &mut Pond,
         _: Witness, 
+        mut strategy: Strategy,
         shares: u64,
         amount: u64,
-        strategy: Strategy,
-        pond: &mut Pond,
     ) {
-        assert_is_this_package<Witness>();
         assert!(
-            !vec_map::contains(&pond.strategies, &get_module<Witness>()),
+            !pond.strategies.contains(&get_module<Witness>()),
             EStrategyAlreadyImplemented
         );
 
@@ -355,29 +339,25 @@ module goose_bumps::pond {
         strategy.shares = shares;
         strategy.amount = amount;
 
-        vec_map::insert(
-            &mut pond.strategies, 
+        pond.strategies.insert(
             get_module<Witness>(), 
             strategy,
         );
     }
 
-    // TODO: add public(package)
-    public fun borrow_strategy_mut<Witness: drop>(
+    public(package) fun borrow_strategy_mut<Witness: drop>(
+        pond: &mut Pond,
         _: Witness, 
-        pond: &mut Pond
     ): &mut Strategy {
-        assert_is_this_package<Witness>();
         assert!(
             vec_map::contains(&pond.strategies, &get_module<Witness>()),
             EStrategyDoesntExist
         );
 
-        vec_map::get_mut(&mut pond.strategies, &get_module<Witness>())
+        pond.strategies.get_mut(&get_module<Witness>())
     }
 
-    // TODO: add public(package)
-    public fun take_position<Position: key + store>(
+    public(package) fun take_position<Position: key + store>(
         strategy: &mut Strategy,
     ): Position {
         assert!(
@@ -388,8 +368,7 @@ module goose_bumps::pond {
         dof::remove(&mut strategy.id, PositionKey {})
     }
 
-    // TODO: add public(package)
-    public fun store_position<Position: key + store>(
+    public(package) fun store_position<Position: key + store>(
         strategy: &mut Strategy,
         position: Position,
     ) {
@@ -401,49 +380,45 @@ module goose_bumps::pond {
         dof::add(&mut strategy.id, PositionKey {}, position);
     }
 
-    // TODO: add public(package)
     // returns the balance share of the user to be deposited in the protocol 
-    public fun get_user_deposit_for_protocol<Witness: drop>(
-        _: Witness, 
+    public(package) fun get_user_deposit_for_protocol<Witness: drop>(
         pond: &Pond,
+        _: Witness, 
         dep_req: &mut DepositRequest,
-        comp_req: &mut CompoundRequest,
+        comp_req: &CompoundRequest,
     ): Balance<BUCK> {
-        assert_is_this_package<Witness>();
-        let balance = balance::value(&dep_req.balance);
+        let balance = dep_req.balance.value();
 
-        if (vec_set::size(&comp_req.receipts) == vec_map::size(&pond.strategies) - 1) {
+        if (comp_req.receipts.size() == pond.strategies.size() - 1) {
             // if it is the last module, we take the rest
-            return balance::split(&mut dep_req.balance, balance)
+            return dep_req.balance.split(balance)
         };
 
-        let strategy = vec_map::get(&pond.strategies, &get_module<Witness>());
+        let strategy = pond.strategies.get(&get_module<Witness>());
         let balance_due = math64::mul_div_up(dep_req.amount, strategy.shares, pond.total_shares);
-        balance::split(&mut dep_req.balance, balance_due)
+        dep_req.balance.split(balance_due)
     }
 
-    // TODO: add public(package)
     // returns the amount the user will withdraw from the protocol 
-    public fun get_user_withdrawal_for_protocol<Witness: drop>(
-        _: Witness, 
+    public(package) fun get_user_withdrawal_for_protocol<Witness: drop>(
         pond: &Pond,
-        request: &mut WithdrawalRequest,
+        _: Witness, 
+        request: &WithdrawalRequest,
     ): u64 {
-        assert_is_this_package<Witness>();
 
-        let strategy_idx = vec_map::get_idx(&pond.strategies, &get_module<Witness>());
-        let amount_in_lower_strategies = 0;
-        let i = vec_map::size(&pond.strategies) - 1;
+        let strategy_idx = pond.strategies.get_idx(&get_module<Witness>());
+        let mut amount_in_lower_strategies = 0;
+        let mut i = pond.strategies.size() - 1;
         // we get all available funds from lower ranked strategies
         while (i > strategy_idx) {
-            let (_, strategy) = vec_map::get_entry_by_idx(&pond.strategies, i);
+            let (_, strategy) = pond.strategies.get_entry_by_idx(i);
             amount_in_lower_strategies = amount_in_lower_strategies + strategy.amount;
 
             i = i - 1;
         };
         // if there's not enough in lower strategies, we need to get amount from this one
         if (amount_in_lower_strategies < request.amount) {
-            let this_strategy = vec_map::get(&pond.strategies, &get_module<Witness>());
+            let this_strategy = pond.strategies.get(&get_module<Witness>());
             // if this one doesn't have enough we take everything
             if (this_strategy.amount < request.amount) return this_strategy.amount;
             // if this one has enough, we return the amount requested
@@ -487,21 +462,15 @@ module goose_bumps::pond {
     //     balance::split(coin::balance_mut(&mut request.coin), amount)
     // }
 
-    // TODO: add public(package)
-    public fun join_withdrawal_balance<Witness: drop>(_: Witness, request: &mut WithdrawalRequest, balance: Balance<BUCK>) {
-        assert_is_this_package<Witness>();
-        balance::join(&mut request.balance, balance);
+    public(package) fun join_withdrawal_balance<Witness: drop>(request: &mut WithdrawalRequest, _: Witness,  balance: Balance<BUCK>) {
+        request.balance.join(balance);
     } 
 
-    // TODO: add public(package)
-    public fun add_compound_receipt<Witness: drop>(_: Witness, request: &mut CompoundRequest) {
-        assert_is_this_package<Witness>();
-        vec_set::insert(&mut request.receipts, get_module<Witness>());
+    public(package) fun add_compound_receipt<Witness: drop>(request: &mut CompoundRequest, _: Witness, ) {
+        request.receipts.insert(get_module<Witness>());
     }
 
-    // TODO: add public(package)
-    public fun add_compound_amount<Witness: drop>(_: Witness, request: &mut CompoundRequest, amount: u64) {
-        assert_is_this_package<Witness>();
+    public(package) fun add_compound_amount<Witness: drop>(request: &mut CompoundRequest, _: Witness,  amount: u64) {
         request.total_buck = request.total_buck + amount;
     } 
 
@@ -509,50 +478,40 @@ module goose_bumps::pond {
 
     // === Private Functions ===
 
-    fun assert_is_this_package<Witness: drop>() {
-        let this_type_name = type_name::get<Package>();
-        let this_package_id = type_name::get_address<>(&this_type_name);
-
-        let witness_type_name = type_name::get<Witness>();
-        let witness_package_id = type_name::get_address<>(&witness_type_name);
-        // TODO: add verify type_name include Witness
-
-        assert!(this_package_id == witness_package_id, EDifferentPackage);
-    }
-
     fun get_module<Witness: drop>(): String {
         let type_name = type_name::get<Witness>();
         type_name::get_module(&type_name)
     }
 
-    fun sort_strategies_by_shares<K: copy, V>(strategies: &mut VecMap<String, Strategy>) {
-        let len = vec_map::size(strategies);
+    // TODO: add public for voting
+    fun sort_strategies_by_shares(strategies: &mut VecMap<String, Strategy>) {
+        let len = strategies.size();
 
-        let i = 0;
+        let mut i = 0;
         while (i < len - 1) {
-            let max_index = i;
+            let mut max_index = i;
 
-            let j = i + 1;
+            let mut j = i + 1;
             while (j < len) {
-                let (_, j_strategy) = vec_map::get_entry_by_idx(strategies, j);
-                let (_, max_index_strategy) = vec_map::get_entry_by_idx(strategies, max_index);
+                let (_, j_strategy) = strategies.get_entry_by_idx(j);
+                let (_, max_index_strategy) = strategies.get_entry_by_idx(max_index);
                 
                 if (j_strategy.shares > max_index_strategy.shares) { max_index = j };
 
                 j = j + 1;
             };
 
-            vec_map::swap(strategies, i, max_index);
+            strategies.swap(i, max_index);
 
             i = i + 1;
         };
     }
 
-    fun assert_receipts_match(pond: &mut Pond, receipts: &VecSet<String>) {
-        let keys = vec_map::keys(&pond.strategies);
-        while (vector::length(&keys) != 0) {
+    fun assert_receipts_match(pond: &Pond, receipts: &VecSet<String>) {
+        let mut keys = pond.strategies.keys();
+        while (keys.length() != 0) {
             assert!(
-                vec_set::contains(receipts, &vector::pop_back(&mut keys)), 
+                receipts.contains(&keys.pop_back()), 
                 ERequestDoesntMatch
             )
         };
@@ -566,10 +525,10 @@ module goose_bumps::pond {
         pond.reserve = total_buck - pond.pending - pond.permanent - pond.treasury;
     }
 
-    fun reserve_buck_supply_duck_ratio(pond: &Pond, manager: &mut DuckManager): u64 {
+    fun reserve_buck_supply_duck_ratio(pond: &Pond, duck_manager: &DuckManager): u64 {
         // TODO: handle supply duck = 0 case
-        if (duck::supply(manager) != 0) {
-            return pond.reserve * MUL / duck::supply(manager)
+        if (duck_manager.supply() != 0) {
+            return pond.reserve * MUL / duck_manager.supply()
         };
 
         1 * MUL
@@ -605,7 +564,7 @@ module goose_bumps::pond {
         shares: u64,
         amount: u64,
     ) {
-        let strat = vec_map::get(&pond.strategies, &ascii::string(name));
+        let strat = pond.strategies.get(&ascii::string(name));
         assert!(shares == strat.shares, 105);
         assert!(amount == strat.amount, 106);
     }
@@ -616,7 +575,7 @@ module goose_bumps::pond {
         amount: u64,
         timestamp: u64,
     ) {
-        let deposit = df::borrow<DepositKey, Deposit>(goose::uid_mut(nft), DepositKey {});
+        let deposit = df::borrow<DepositKey, Deposit>(nft.uid_mut(), DepositKey {});
         assert!(amount == deposit.amount, 107);
         assert!(timestamp == deposit.timestamp, 108);
     }
@@ -625,6 +584,7 @@ module goose_bumps::pond {
     public fun assert_no_deposit(
         nft: &mut Goose,
     ) {
-        assert!(!df::exists_(goose::uid_mut(nft), DepositKey {}), 109);
+        assert!(!df::exists_(nft.uid_mut(), DepositKey {}), 109);
     }
 }
+

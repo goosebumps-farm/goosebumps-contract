@@ -1,21 +1,17 @@
 module goose_bumps::bucket_tank {
-    use sui::tx_context::TxContext;
     use sui::sui::SUI;
     use sui::coin::{Self, Coin};
-    use sui::balance::{Self, Balance};
+    use sui::balance::{Balance};
     use sui::clock::{Clock};
-    use sui::transfer;
 
     use goose_bumps::pond::{Self, DepositRequest, WithdrawalRequest, CompoundRequest, Pond, Strategy};
 
-    use bucket_protocol::tank::{Self, ContributorToken};
-    use bucket_protocol::buck::{Self, BUCK, BucketProtocol};
+    use bucket_protocol::tank::{ContributorToken};
+    use bucket_protocol::buck::{BUCK, BucketProtocol};
     use bucket_protocol::bkt::BktTreasury;
     use bucket_oracle::bucket_oracle::BucketOracle;
-
-    const EBucketAlreadyImplemented: u64 = 0;
     
-    struct Witness has drop {}
+    public struct Witness has drop {}
 
     // called once
     public fun init_strategy(
@@ -24,13 +20,13 @@ module goose_bumps::bucket_tank {
         coin: Coin<BUCK>,
         ctx: &mut TxContext,
     ) {
-        let amount = coin::value(&coin);
-        let strategy = pond::new_strategy(ctx);
-        let tank = buck::borrow_tank_mut<SUI>(bp);
-        let token = tank::deposit(tank, coin::into_balance(coin), ctx);
+        let amount = coin.value();
+        let mut strategy = pond::new_strategy(ctx);
+        let tank = bp.borrow_tank_mut<SUI>();
+        let token = tank.deposit(coin.into_balance(), ctx);
         
-        pond::store_position(&mut strategy, token);
-        pond::add_strategy(Witness {}, 1, amount, strategy, pond); // abort if already exists
+        strategy.store_position(token);
+        pond.add_strategy(Witness {}, strategy, 1, amount); // abort if already exists
     }
 
     public fun deposit(
@@ -44,22 +40,21 @@ module goose_bumps::bucket_tank {
         ctx: &mut TxContext
     ) {
         // get user balance to deposit in bucket 
-        let user_balance = pond::get_user_deposit_for_protocol(
+        let user_balance = pond.get_user_deposit_for_protocol(
             Witness {}, 
-            pond, 
             dep_req, 
             comp_req
         );
-        let strategy = pond::borrow_strategy_mut(Witness {}, pond);
+        let strategy = pond.borrow_strategy_mut(Witness {});
         // update strategy data
-        pond::increase_strategy_amount(balance::value(&user_balance), strategy);
+        strategy.increase_strategy_amount(user_balance.value());
         // merge user_balance with all buck
-        let buck = get_all_buck(strategy, bp, oracle, bt, clock, ctx);
-        balance::join(&mut buck, user_balance);
+        let mut buck = get_all_buck(strategy, bp, oracle, bt, clock, ctx);
+        buck.join(user_balance);
         // deposit into bucket tank, store the token and validate rule
-        let token = tank::deposit(buck::borrow_tank_mut<SUI>(bp), buck, ctx);
-        pond::store_position(strategy, token);
-        pond::add_compound_receipt(Witness {}, comp_req);
+        let token = bp.borrow_tank_mut<SUI>().deposit(buck, ctx);
+        strategy.store_position(token);
+        comp_req.add_compound_receipt(Witness {});
     }
 
     public fun withdraw(
@@ -73,18 +68,18 @@ module goose_bumps::bucket_tank {
         ctx: &mut TxContext
     ) {
         // get user amount to withdraw from bucket
-        let user_amount = pond::get_user_withdrawal_for_protocol(Witness {}, pond, wit_req);
-        let strategy = pond::borrow_strategy_mut(Witness {}, pond);
+        let user_amount = pond.get_user_withdrawal_for_protocol(Witness {}, wit_req);
+        let strategy = pond.borrow_strategy_mut(Witness {});
         // update strategy data
-        pond::decrease_strategy_amount(user_amount, strategy);
+        strategy.decrease_strategy_amount(user_amount);
         // merge it with the rest of the balance to withdraw
-        let buck = get_all_buck(strategy, bp, oracle, bt, clock, ctx);
-        let balance = balance::split(&mut buck, user_amount);
-        pond::join_withdrawal_balance(Witness {}, wit_req, balance);
+        let mut buck = get_all_buck(strategy, bp, oracle, bt, clock, ctx);
+        let balance = buck.split(user_amount);
+        wit_req.join_withdrawal_balance(Witness {}, balance);
         // deposit into bucket tank, store the token and validate rule
-        let token = tank::deposit(buck::borrow_tank_mut<SUI>(bp), buck, ctx);
-        pond::store_position(strategy, token);
-        pond::add_compound_receipt(Witness {}, comp_req);
+        let token = bp.borrow_tank_mut<SUI>().deposit(buck, ctx);
+        strategy.store_position(token);
+        comp_req.add_compound_receipt(Witness {});
     }
 
     public fun compound(
@@ -96,14 +91,14 @@ module goose_bumps::bucket_tank {
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        let strategy = pond::borrow_strategy_mut(Witness {}, pond);
+        let strategy = pond.borrow_strategy_mut(Witness {});
         // get total buck in this protocol and add it to total
         let buck = get_all_buck(strategy, bp, oracle, bt, clock, ctx);
-        pond::add_compound_amount(Witness {}, comp_req, balance::value(&buck));
+        comp_req.add_compound_amount(Witness {}, buck.value());
         // deposit into bucket tank, store the token and validate rule
-        let token = tank::deposit(buck::borrow_tank_mut<SUI>(bp), buck, ctx);
-        pond::store_position(strategy, token);
-        pond::add_compound_receipt(Witness {}, comp_req);
+        let token = bp.borrow_tank_mut<SUI>().deposit(buck, ctx);
+        strategy.store_position(token);
+        comp_req.add_compound_receipt(Witness {});
     }
 
     fun get_all_buck(
@@ -114,12 +109,12 @@ module goose_bumps::bucket_tank {
         clock: &Clock,
         ctx: &mut TxContext
     ): Balance<BUCK> {
-        let token: ContributorToken<BUCK, SUI> = pond::take_position(strategy);
-        let (buck, sui, bkt) = buck::tank_withdraw<SUI>(bp, oracle, clock, bt, token, ctx);
+        let token: ContributorToken<BUCK, SUI> = strategy.take_position();
+        let (buck, sui, bkt) = bp.tank_withdraw<SUI>(oracle, clock, bt, token, ctx);
         // TODO: to remove and add HPP for swapping 
         transfer::public_transfer(coin::from_balance(sui, ctx), @0xfcd5f2eee4ca6d81d49c85a1669503b7fc8e641b406fe7cdb696a67ef861492c);
         // TODO: to remove and replace 
-        balance::destroy_zero(bkt);
+        bkt.destroy_zero();
 
         buck
     }

@@ -1,18 +1,13 @@
 module goose_bumps::goose {
     use std::string::{utf8, String};
     
-    use sui::object::{Self, ID, UID};
     use sui::event;
-    use sui::transfer;
     use sui::display;
     use sui::package;
-    use sui::tx_context::{Self, TxContext};
-
-    friend goose_bumps::pond;
     
     // === Structs ===
 
-    struct Goose has key, store {
+    public struct Goose has key, store {
         id: UID,
         // standard fields minus display
         name: String,
@@ -24,14 +19,14 @@ module goose_bumps::goose {
 
     // ==== Events ====
 
-    struct GooseMinted has copy, drop {
+    public struct GooseMinted has copy, drop {
         // The Object ID of the NFT
         id: ID,
         // The owner of the NFT
         owner: address,
     }
 
-    struct GooseUpdated has copy, drop {
+    public struct GooseUpdated has copy, drop {
         // The Object ID of the NFT
         id: ID,
         // The owner of the NFT
@@ -40,7 +35,7 @@ module goose_bumps::goose {
         status: u8,
     }
 
-    struct GOOSE has drop {}
+    public struct GOOSE has drop {}
 
     // ===== Init =====
 
@@ -63,11 +58,11 @@ module goose_bumps::goose {
 
         let publisher = package::claim(otw, ctx);
 
-        let display = display::new_with_fields<Goose>(
+        let mut display = display::new_with_fields<Goose>(
             &publisher, keys, values, ctx
         );
 
-        display::update_version(&mut display);
+        display.update_version();
 
         transfer::public_transfer(publisher, tx_context::sender(ctx));
         transfer::public_transfer(display, tx_context::sender(ctx));
@@ -81,7 +76,7 @@ module goose_bumps::goose {
 
     // === Public-Friend Functions ===
 
-    public(friend) fun create(
+    public(package) fun create(
         name: vector<u8>,
         image_url: vector<u8>,
         thumbnail_url: vector<u8>,
@@ -98,19 +93,19 @@ module goose_bumps::goose {
 
         event::emit(GooseMinted {
             id: object::id(&nft),
-            owner: tx_context::sender(ctx),
+            owner: ctx.sender(),
         });
 
         nft
     }
 
-    public(friend) fun update(
+    public(package) fun update(
         self: &mut Goose,
         name: vector<u8>,
         image_url: vector<u8>,
         thumbnail_url: vector<u8>,
         status: u8,
-        ctx: &mut TxContext
+        ctx: &TxContext
     ) {
         self.name = utf8(name);
         self.image_url = utf8(image_url);
@@ -124,9 +119,9 @@ module goose_bumps::goose {
         });
     }
 
-    public(friend) fun destroy(nft: Goose) {
+    public(package) fun destroy(nft: Goose) {
         let Goose { 
-            id, name: _, 
+            id, name: _,
             image_url: _, 
             thumbnail_url: _, 
             status: _
@@ -135,14 +130,11 @@ module goose_bumps::goose {
         object::delete(id)
     }
 
-    public(friend) fun uid_mut(self: &mut Goose): &mut UID {
+    public(package) fun uid_mut(self: &mut Goose): &mut UID {
         &mut self.id
     }
     
     // === Test Functions ===
-
-    #[test_only]
-    friend goose_bumps::goose_tests;
 
     #[test_only]
     public fun init_for_testing(ctx: &mut TxContext) {
