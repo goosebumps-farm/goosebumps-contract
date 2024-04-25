@@ -1,7 +1,6 @@
 module goose_bumps::pond {
     // === Imports ===
-    use std::type_name::{Self};
-    use std::ascii::{Self, String};
+    use std::ascii::String;
 
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
@@ -23,6 +22,7 @@ module goose_bumps::pond {
 
     const PUMP_FEE: u64 = 50_000_000; // 5%
     const MUL: u64 = 1_000_000_000; // scaling factor
+    const MS_IN_MONTH: u64 = 1000 * 60 * 60 * 24 * 30;
 
     // === Errors ===
 
@@ -33,7 +33,6 @@ module goose_bumps::pond {
     const ERequestDoesntMatch: u64 = 6;
     const ENotEgg: u64 = 7;
     const EZeroCoin: u64 = 8;
-    const ENotWitness: u64 = 9;
 
     // === Structs ===
 
@@ -234,22 +233,26 @@ module goose_bumps::pond {
 
         let CompoundRequest { total_buck, receipts } = comp_req;     
         compound_buckets(pond, total_buck);
-        // TODO: test accrual_param
-        // let accrual_param = duck::handle_accrual_param(duck_manager, clock);
-        let accrual_param = 1000000;
 
-        let fee = amount * PUMP_FEE / MUL;
-        let treasury_amount = fee / 10;
+        let fee = amount * PUMP_FEE / MUL; // permanent + treasury
+        let treasury_amount = fee * 2 / 5;
         let permanent_amount = fee - treasury_amount;
         let user_amount = amount - fee;
 
         let egg_age = (clock.timestamp_ms() - timestamp) * MUL;
+        // this param increase from 0 to 1 over 30 days increasingly slowly
+        let accrual_param = if (egg_age > MS_IN_MONTH) MUL else {
+            math64::sqrt_down(
+                math64::mul_div_down(MUL, egg_age, MS_IN_MONTH)
+            )
+        };
         let ratio = reserve_buck_supply_duck_ratio(pond, duck_manager);
-        let accrued_duck = MUL * math64::mul_div_down(
+        // this amount is capped at user_amount / ratio
+        let accrued_duck = math64::mul_div_down(
             user_amount, 
-            egg_age, 
-            (egg_age + accrual_param)
-        ) / ratio;
+            accrual_param, 
+            ratio
+        );
 
         assert_receipts_match(pond, &receipts);
 
