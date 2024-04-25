@@ -33,6 +33,7 @@ module goose_bumps::pond {
     const ERequestDoesntMatch: u64 = 6;
     const ENotEgg: u64 = 7;
     const EZeroCoin: u64 = 8;
+    const ENotWitness: u64 = 9;
 
     // === Structs ===
 
@@ -296,7 +297,7 @@ module goose_bumps::pond {
         coin::from_balance(balance, ctx)
     }
 
-    // === Public-Friend Functions ===
+    // === Public-Package Functions ===
 
     public(package) fun new_strategy(
         ctx: &mut TxContext,
@@ -322,15 +323,15 @@ module goose_bumps::pond {
         strategy.amount = strategy.amount - amount;
     }
 
-    public(package) fun add_strategy<Witness: drop>(
+    public(package) fun add_strategy(
         pond: &mut Pond,
-        _: Witness, 
         mut strategy: Strategy,
+        module_name: String, 
         shares: u64,
         amount: u64,
     ) {
         assert!(
-            !pond.strategies.contains(&get_module<Witness>()),
+            !pond.strategies.contains(&module_name),
             EStrategyAlreadyImplemented
         );
 
@@ -340,21 +341,21 @@ module goose_bumps::pond {
         strategy.amount = amount;
 
         pond.strategies.insert(
-            get_module<Witness>(), 
+            module_name, 
             strategy,
         );
     }
 
-    public(package) fun borrow_strategy_mut<Witness: drop>(
+    public(package) fun borrow_strategy_mut(
         pond: &mut Pond,
-        _: Witness, 
+        module_name: String, 
     ): &mut Strategy {
         assert!(
-            vec_map::contains(&pond.strategies, &get_module<Witness>()),
+            vec_map::contains(&pond.strategies, &module_name),
             EStrategyDoesntExist
         );
 
-        pond.strategies.get_mut(&get_module<Witness>())
+        pond.strategies.get_mut(&module_name)
     }
 
     public(package) fun take_position<Position: key + store>(
@@ -381,11 +382,11 @@ module goose_bumps::pond {
     }
 
     // returns the balance share of the user to be deposited in the protocol 
-    public(package) fun get_user_deposit_for_protocol<Witness: drop>(
+    public(package) fun get_user_deposit_for_protocol(
         pond: &Pond,
-        _: Witness, 
         dep_req: &mut DepositRequest,
         comp_req: &CompoundRequest,
+        module_name: String, 
     ): Balance<BUCK> {
         let balance = dep_req.balance.value();
 
@@ -394,19 +395,19 @@ module goose_bumps::pond {
             return dep_req.balance.split(balance)
         };
 
-        let strategy = pond.strategies.get(&get_module<Witness>());
+        let strategy = pond.strategies.get(&module_name);
         let balance_due = math64::mul_div_up(dep_req.amount, strategy.shares, pond.total_shares);
         dep_req.balance.split(balance_due)
     }
 
     // returns the amount the user will withdraw from the protocol 
-    public(package) fun get_user_withdrawal_for_protocol<Witness: drop>(
+    public(package) fun get_user_withdrawal_for_protocol(
         pond: &Pond,
-        _: Witness, 
         request: &WithdrawalRequest,
+        module_name: String, 
     ): u64 {
 
-        let strategy_idx = pond.strategies.get_idx(&get_module<Witness>());
+        let strategy_idx = pond.strategies.get_idx(&module_name);
         let mut amount_in_lower_strategies = 0;
         let mut i = pond.strategies.size() - 1;
         // we get all available funds from lower ranked strategies
@@ -418,7 +419,7 @@ module goose_bumps::pond {
         };
         // if there's not enough in lower strategies, we need to get amount from this one
         if (amount_in_lower_strategies < request.amount) {
-            let this_strategy = pond.strategies.get(&get_module<Witness>());
+            let this_strategy = pond.strategies.get(&module_name);
             // if this one doesn't have enough we take everything
             if (this_strategy.amount < request.amount) return this_strategy.amount;
             // if this one has enough, we return the amount requested
@@ -462,15 +463,15 @@ module goose_bumps::pond {
     //     balance::split(coin::balance_mut(&mut request.coin), amount)
     // }
 
-    public(package) fun join_withdrawal_balance<Witness: drop>(request: &mut WithdrawalRequest, _: Witness,  balance: Balance<BUCK>) {
+    public(package) fun join_withdrawal_balance(request: &mut WithdrawalRequest, balance: Balance<BUCK>) {
         request.balance.join(balance);
     } 
 
-    public(package) fun add_compound_receipt<Witness: drop>(request: &mut CompoundRequest, _: Witness, ) {
-        request.receipts.insert(get_module<Witness>());
+    public(package) fun add_compound_receipt(request: &mut CompoundRequest, module_name: String) {
+        request.receipts.insert(module_name);
     }
 
-    public(package) fun add_compound_amount<Witness: drop>(request: &mut CompoundRequest, _: Witness,  amount: u64) {
+    public(package) fun add_compound_amount(request: &mut CompoundRequest, amount: u64) {
         request.total_buck = request.total_buck + amount;
     } 
 
@@ -478,10 +479,16 @@ module goose_bumps::pond {
 
     // === Private Functions ===
 
-    fun get_module<Witness: drop>(): String {
-        let type_name = type_name::get<Witness>();
-        type_name::get_module(&type_name)
-    }
+    // fun get_module<Witness: drop>(): String {
+    //     let type_name = type_name::get<Witness>();
+    //     let mut name = type_name.into_string();
+    //     let mut ref = ascii::string(b"Witness");
+    //     while (ref.length() > 0) {
+    //         // we want to make sure it's the Witness type and not another one
+    //         assert!(name.pop_char() == ref.pop_char(), ENotWitness);
+    //     };
+    //     type_name.get_module()
+    // }
 
     // TODO: add public for voting
     fun sort_strategies_by_shares(strategies: &mut VecMap<String, Strategy>) {
