@@ -567,11 +567,11 @@ module goose_bumps::pond {
     #[test_only]
     public fun assert_strategy_data(
         pond: &Pond,
-        name: vector<u8>,
+        module_name: String,
         shares: u64,
         amount: u64,
     ) {
-        let strat = pond.strategies.get(&ascii::string(name));
+        let strat = pond.strategies.get(&module_name);
         assert!(shares == strat.shares, 105);
         assert!(amount == strat.amount, 106);
     }
