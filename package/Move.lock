@@ -2,12 +2,21 @@
 
 [move]
 version = 1
-manifest_digest = "4B30BC42A833AF91C6E1DFF6A664F17B505701AF3A9B552234563ED8BFC46D37"
-deps_digest = "F9B494B64F0615AED0E98FC12A85B85ECD2BC5185C22D30E7F67786BB52E507C"
-dependencies = [
+manifest_digest = "ECAA75FDFF92A7E880AFE5BB4471CAC0F27EA70BED51ED06F3BC5A4CC43ACA81"
+deps_digest = "04732BFEF428F74DE262001DC455D76B909EBC394B034A9A15CC095E4BDD9CEF"
+dev-dependencies = [
+  { name = "AfSui" },
   { name = "BucketOracle" },
   { name = "BucketProtocol" },
-  { name = "MoveStdlib" },
+  { name = "Sui" },
+]
+
+[[move.package]]
+name = "AfSui"
+source = { local = "deps/aftermath-interfaces/afsui/afsui" }
+
+dev-dependencies = [
+  { name = "Safe" },
   { name = "Sui" },
 ]
 
@@ -15,7 +24,7 @@ dependencies = [
 name = "BucketFramework"
 source = { local = "deps/bucket-v1-core/framework" }
 
-dependencies = [
+dev-dependencies = [
   { name = "Sui" },
 ]
 
@@ -31,7 +40,7 @@ dependencies = [
 name = "BucketProtocol"
 source = { local = "deps/bucket-v1-core/protocol" }
 
-dependencies = [
+dev-dependencies = [
   { name = "BucketFramework" },
   { name = "BucketOracle" },
   { name = "Sui" },
@@ -40,6 +49,14 @@ dependencies = [
 [[move.package]]
 name = "MoveStdlib"
 source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainnet", subdir = "crates/sui-framework/packages/move-stdlib" }
+
+[[move.package]]
+name = "Safe"
+source = { local = "deps/aftermath-interfaces/utility/safe" }
+
+dev-dependencies = [
+  { name = "Sui" },
+]
 
 [[move.package]]
 name = "Sui"

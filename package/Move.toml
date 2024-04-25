@@ -9,12 +9,13 @@ edition = "2024.beta"
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 BucketProtocol = { local = "./deps/bucket-v1-core/protocol" }
 BucketOracle = { git = "https://github.com/Bucket-Protocol/oracle.git", rev = "testnet" }
+AfSui = { local = "./deps/aftermath-interfaces/afsui" }
 
 [dev-dependencies]
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
 BucketProtocol = { local = "./deps/bucket-v1-core/protocol" }
 BucketOracle = { git = "https://github.com/Bucket-Protocol/oracle.git", rev = "test-only" }
+AfSui = { local = "./deps/aftermath-interfaces/afsui" }
 
 [addresses]
 goose_bumps = "0x0"
-
