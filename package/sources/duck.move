@@ -6,8 +6,6 @@ module goose_bumps::duck {
     use sui::url;
     use sui::clock::Clock;
 
-    use goose_bumps::math64;
-
     public struct DUCK has drop {}
 
     public struct DuckManager has key {
@@ -104,32 +102,6 @@ module goose_bumps::duck {
     public(package) fun current_period(manager: &DuckManager, clock: &Clock): u64 {
         let duration = clock.timestamp_ms() - manager.publish_timestamp;
         duration / manager.adjustment_period_ms
-    }
-
-    public(package) fun handle_accrual_param(manager: &mut DuckManager, clock: &Clock): u64 {
-        // accrual param can't go lower than minimum
-        if (manager.accrual_param == manager.min_accrual_param) return manager.accrual_param;
-        
-        let current_period = current_period(manager, clock);
-        if (current_period > manager.last_period_adjusted) {
-            let target_adjustment_period = math64::div_up(
-                manager.average_start_time + manager.target_average_age - manager.publish_timestamp,
-                manager.adjustment_period_ms
-            );
-            // adjustment period not reached
-            if (current_period < target_adjustment_period) return manager.accrual_param;
-            // how many times accrual param should adjusted
-            let adjustments = current_period - target_adjustment_period;
-            let adjusted_accrual_param 
-                = manager.accrual_param * math64::pow(manager.adjustment_mul, adjustments);
-            // accrual param can't go lower than minimum
-            if (adjusted_accrual_param > manager.min_accrual_param) {
-                manager.accrual_param = adjusted_accrual_param;
-            };
-        };
-
-        manager.last_period_adjusted = current_period;
-        manager.accrual_param
     }
 
     // === Admin only ===

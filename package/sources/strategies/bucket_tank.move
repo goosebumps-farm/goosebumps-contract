@@ -157,15 +157,5 @@ module goose_bumps::bucket_tank {
     //     transfer::public_transfer(coin::from_balance(sui_balance, ctx), @0xfcd5f2eee4ca6d81d49c85a1669503b7fc8e641b406fe7cdb696a67ef861492c);
     //     buck_balance
     // }
-
-    // #[test_only]
-    // public fun init_strategy_for_testing<CoinType: drop>(
-    //     pond: &mut Pond, 
-    //     bp: &mut BucketProtocol, 
-    //     coin: Coin<BUCK>, 
-    //     ctx: &mut TxContext
-    // ) {
-    //     init_strategy<CoinType>(pond, bp, coin, ctx);
-    // }
 }
 

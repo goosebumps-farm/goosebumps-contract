@@ -2,7 +2,7 @@
 
 [move]
 version = 1
-manifest_digest = "ECAA75FDFF92A7E880AFE5BB4471CAC0F27EA70BED51ED06F3BC5A4CC43ACA81"
+manifest_digest = "062BE26C1512522E24336892A9216E1F0DD98D6BF7EB4B5355CFAE1DCFE0E172"
 deps_digest = "04732BFEF428F74DE262001DC455D76B909EBC394B034A9A15CC095E4BDD9CEF"
 dev-dependencies = [
   { name = "AfSui" },
@@ -13,7 +13,7 @@ dev-dependencies = [
 
 [[move.package]]
 name = "AfSui"
-source = { local = "deps/aftermath-interfaces/afsui/afsui" }
+source = { local = "deps/aftermath-interfaces/afsui" }
 
 dev-dependencies = [
   { name = "Safe" },
@@ -52,7 +52,7 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainn
 
 [[move.package]]
 name = "Safe"
-source = { local = "deps/aftermath-interfaces/utility/safe" }
+source = { local = "deps/aftermath-interfaces/safe" }
 
 dev-dependencies = [
   { name = "Sui" },
