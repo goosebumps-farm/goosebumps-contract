@@ -14,7 +14,8 @@
     "bump": "bun ./src/bump.ts",
     "dump": "bun ./src/dump.ts",
     "pump": "bun ./src/pump.ts",
-    "redeem": "bun ./src/redeem.ts"
+    "redeem": "bun ./src/redeem.ts",
+    "send": "bun ./src/send.ts"
   },
   "dependencies": {
     "@mysten/sui.js": "^0.49.1",
