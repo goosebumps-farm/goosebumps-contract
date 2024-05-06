@@ -105,23 +105,23 @@ module goose_bumps::pond {
 
     // === Events ===
 
-    public struct GooseBumps has drop, copy, store {
+    public struct GooseBumps has copy, drop {
         user: address,
         amount: u64,
     }
 
-    public struct GooseDumps has drop, copy, store {
+    public struct GooseDumps has copy, drop {
         user: address,
         amount: u64,
     }
 
-    public struct GoosePumps has drop, copy, store {
+    public struct GoosePumps has copy, drop {
         user: address,
         buck_amount: u64,
         duck_amount: u64,
     }
 
-    public struct RedeemDuck has drop, copy, store {
+    public struct RedeemDuck has copy, drop {
         user: address,
         buck_amount: u64,
         duck_amount: u64,
