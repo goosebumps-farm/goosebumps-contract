@@ -311,6 +311,30 @@ module goose_bumps::pond {
         coin::from_balance(balance, ctx)
     }
 
+    public fun sort_strategies_by_shares(pond: &mut Pond) {
+        let strategies = &mut pond.inner_mut().strategies;
+        let len = strategies.size();
+
+        let mut i = 0;
+        while (i < len - 1) {
+            let mut max_index = i;
+
+            let mut j = i + 1;
+            while (j < len) {
+                let (_, j_strategy) = strategies.get_entry_by_idx(j);
+                let (_, max_index_strategy) = strategies.get_entry_by_idx(max_index);
+                
+                if (j_strategy.shares > max_index_strategy.shares) { max_index = j };
+
+                j = j + 1;
+            };
+
+            strategies.swap(i, max_index);
+
+            i = i + 1;
+        };
+    }
+
     // === Public-Package Functions ===
 
     public(package) fun new_strategy(
@@ -510,30 +534,6 @@ module goose_bumps::pond {
 
     fun inner_mut(pond: &mut Pond): &mut PondInner {
         pond.inner.load_value_mut()
-    }
-
-    // TODO: add public for voting
-    fun sort_strategies_by_shares(strategies: &mut VecMap<String, Strategy>) {
-        let len = strategies.size();
-
-        let mut i = 0;
-        while (i < len - 1) {
-            let mut max_index = i;
-
-            let mut j = i + 1;
-            while (j < len) {
-                let (_, j_strategy) = strategies.get_entry_by_idx(j);
-                let (_, max_index_strategy) = strategies.get_entry_by_idx(max_index);
-                
-                if (j_strategy.shares > max_index_strategy.shares) { max_index = j };
-
-                j = j + 1;
-            };
-
-            strategies.swap(i, max_index);
-
-            i = i + 1;
-        };
     }
 
     fun assert_receipts_match(pond: &Pond, receipts: &VecSet<String>) {

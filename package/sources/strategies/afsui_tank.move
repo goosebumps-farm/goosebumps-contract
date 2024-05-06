@@ -5,6 +5,7 @@ module goose_bumps::afsui_tank {
 
     use goose_bumps::pond::{DepositRequest, WithdrawalRequest, CompoundRequest, Pond};
     use goose_bumps::bucket_tank;
+    use goose_bumps::admin::AdminCap;
 
     use bucket_protocol::buck::{BUCK, BucketProtocol};
     use bucket_protocol::bkt::BktTreasury;
@@ -15,6 +16,7 @@ module goose_bumps::afsui_tank {
     public fun init_strategy(
         pond: &mut Pond,
         bp: &mut BucketProtocol,
+        _cap: &AdminCap,
         coin: Coin<BUCK>,
         ctx: &mut TxContext,
     ) {
