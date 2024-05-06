@@ -69,10 +69,11 @@ module goose_bumps::sui_tank {
     public fun init_strategy_for_testing(
         pond: &mut Pond, 
         bp: &mut BucketProtocol, 
+        cap: &AdminCap,
         coin: Coin<BUCK>, 
         ctx: &mut TxContext
     ) {
-        init_strategy(pond, bp, coin, ctx);
+        init_strategy(pond, bp, cap, coin, ctx);
     }
 }
 
