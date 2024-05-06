@@ -1,7 +1,7 @@
 module goose_bumps::pond {
     // === Imports ===
     use std::ascii::String;
-
+    use sui::event;
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Balance};
     use sui::clock::Clock;
@@ -103,6 +103,29 @@ module goose_bumps::pond {
         // DOF: LP token or Receipt (position)
     }
 
+    // === Events ===
+
+    public struct GooseBumps has drop, copy, store {
+        user: address,
+        amount: u64,
+    }
+
+    public struct GooseDumps has drop, copy, store {
+        user: address,
+        amount: u64,
+    }
+
+    public struct GoosePumps has drop, copy, store {
+        user: address,
+        buck_amount: u64,
+        duck_amount: u64,
+    }
+
+    public struct RedeemDuck has drop, copy, store {
+        user: address,
+        buck_amount: u64,
+        duck_amount: u64,
+    }
 
     fun init(ctx: &mut TxContext) {
         // init pond
@@ -170,6 +193,8 @@ module goose_bumps::pond {
         balance.destroy_zero();
         assert_receipts_match(pond, &receipts);
 
+        event::emit(GooseBumps { user: ctx.sender(), amount });
+
         nft
     }
 
@@ -209,6 +234,8 @@ module goose_bumps::pond {
         pond.inner_mut().pending = pond.inner().pending - amount;
         assert_receipts_match(pond, &receipts);
 
+        event::emit(GooseDumps { user: ctx.sender(), amount });
+
         coin::from_balance(balance, ctx)
     }
         
@@ -245,20 +272,12 @@ module goose_bumps::pond {
         let treasury_amount = fee * 2 / 5; // 2%
         let permanent_amount = fee - treasury_amount; // 3%
         let user_amount = amount - fee;
-
-        let egg_age = (clock.timestamp_ms() - timestamp) * MUL;
-        // this param increase from 0 to 1 over 30 days increasingly slowly
-        let accrual_param = if (egg_age > MS_IN_MONTH) MUL else {
-            math64::sqrt_down(
-                math64::mul_div_down(MUL, egg_age, MS_IN_MONTH)
-            )
-        };
-        let ratio = reserve_buck_supply_duck_ratio(pond, duck_manager);
-        // this amount is capped at user_amount / ratio
-        let accrued_duck = math64::mul_div_down(
+        let accrued_duck = calculate_accrued_duck(
+            pond, 
+            duck_manager, 
+            clock, 
             user_amount, 
-            accrual_param, // scaled with MUL
-            ratio // scaled with MUL
+            timestamp
         );
 
         assert_receipts_match(pond, &receipts);
@@ -267,6 +286,15 @@ module goose_bumps::pond {
         pond.inner_mut().reserve = pond.inner().reserve + user_amount;
         pond.inner_mut().permanent = pond.inner().permanent + permanent_amount;
         pond.inner_mut().treasury = pond.inner().treasury + treasury_amount;
+
+        event::emit(
+            GoosePumps { 
+                user: ctx.sender(), 
+                buck_amount: user_amount,
+                duck_amount: accrued_duck,
+            }
+        );
+
         duck_manager.cap().mint(accrued_duck, ctx)
     }
     
@@ -277,7 +305,9 @@ module goose_bumps::pond {
         duck_manager: &mut DuckManager, 
         coin: Coin<DUCK>, 
         comp_req: CompoundRequest,
+        ctx: &mut TxContext,
     ): (CompoundRequest, WithdrawalRequest) {
+        assert!(coin.value() > 0, EZeroCoin);
         let CompoundRequest { total_buck, receipts } = comp_req;
         assert_receipts_match(pond, &receipts);
 
@@ -286,6 +316,14 @@ module goose_bumps::pond {
             coin.value(), 
             pond.inner().reserve, 
             duck_manager.supply()
+        );
+
+        event::emit(
+            RedeemDuck { 
+                user: ctx.sender(), 
+                buck_amount: coin.value(),
+                duck_amount: amount,
+            }
         );
         duck_manager.cap().burn(coin);
 
@@ -309,6 +347,29 @@ module goose_bumps::pond {
         pond.inner_mut().reserve = pond.inner().reserve - amount;
         
         coin::from_balance(balance, ctx)
+    }
+
+    public fun calculate_accrued_duck(
+        pond: &Pond,
+        duck_manager: &DuckManager,
+        clock: &Clock,
+        user_amount: u64,
+        timestamp: u64,
+    ): u64 {
+        let egg_age = (clock.timestamp_ms() - timestamp) * MUL;
+        // this param increase from 0 to 1 over 30 days increasingly slowly
+        let accrual_param = if (egg_age > MS_IN_MONTH) MUL else {
+            math64::sqrt_down(
+                math64::mul_div_down(MUL, egg_age, MS_IN_MONTH)
+            )
+        };
+        let ratio = reserve_buck_supply_duck_ratio(pond, duck_manager);
+        // this amount is capped at user_amount / ratio
+        math64::mul_div_down(
+            user_amount, 
+            accrual_param, // scaled with MUL
+            ratio // scaled with MUL
+        )
     }
 
     public fun sort_strategies_by_shares(pond: &mut Pond) {

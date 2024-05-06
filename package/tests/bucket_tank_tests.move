@@ -191,6 +191,7 @@ module goose_bumps::bucket_tank_tests{
             &mut world.dm,
             duck,
             comp_req, 
+            world.scenario.ctx()
         );
         bucket_tank::withdraw<SUI>(
             module_name(), 
