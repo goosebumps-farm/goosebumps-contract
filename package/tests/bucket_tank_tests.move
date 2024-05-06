@@ -21,7 +21,8 @@ module goose_bumps::bucket_tank_tests{
     const MUL: u64 = 1_000_000_000; // scaling factor
 
     const OWNER: address = @0xBABE;
-    const ALICE: address = @0xCAFE;
+    const ALICE: address = @0xA11CE;
+    const BOB: address = @0xB0B;
 
     public struct World {
         scenario: Scenario,
@@ -64,15 +65,17 @@ module goose_bumps::bucket_tank_tests{
         duck::init_for_testing(scen.ctx());
         goose::init_for_testing(scen.ctx());
         
+        // initialize shared objects
         let clock = clock::create_for_testing(scen.ctx());
         clock.share_for_testing();
         buck::share_for_testing(tu::create_one_time_witness<BUCK>(), OWNER, scen.ctx());
         bkt::share_for_testing(tu::create_one_time_witness<BKT>(), OWNER, scen.ctx());
         bucket_oracle::share_for_testing<SUI>(9, OWNER, scen.ctx());
 
+        // finalize tx to move objects into the account and global inventories
         scen.next_tx(OWNER);
 
-        // get shared objects for world
+        // get shared objects to compose World
         let clock = scen.take_shared<Clock>();
         let dm = scen.take_shared<DuckManager>();
         let mut pond = scen.take_shared<Pond>();
@@ -80,7 +83,7 @@ module goose_bumps::bucket_tank_tests{
         let bt = scen.take_shared<BktTreasury>();
         let bo = scen.take_shared<BucketOracle>();
 
-        // init shared objects
+        // admin function to be executed once at the beginning
         bucket_tank::init_strategy<SUI>(
             module_name(), 
             &mut pond, 

@@ -4,7 +4,6 @@ module goose_bumps::duck {
 
     use sui::coin::{Self, Coin, TreasuryCap, CoinMetadata};
     use sui::url;
-    use sui::clock::Clock;
 
     public struct DUCK has drop {}
 

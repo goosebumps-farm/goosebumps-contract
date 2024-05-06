@@ -8,6 +8,7 @@ module goose_bumps::pond {
     use sui::vec_set::{Self, VecSet};
     use sui::dynamic_field as df;
     use sui::dynamic_object_field as dof;
+    use sui::versioned::{Self, Versioned};
 
     use bucket_protocol::buck::BUCK;
 
@@ -74,7 +75,11 @@ module goose_bumps::pond {
 
     public struct Pond has key {
         id: UID,
-        version: u64,
+        // store PondInner to enable a potential PondInnerV2
+        inner: Versioned,
+    }
+
+    public struct PondInner has store {
         // pending or bonding amount 
         pending: u64,
         // redeemable supply
@@ -101,16 +106,18 @@ module goose_bumps::pond {
 
     fun init(ctx: &mut TxContext) {
         // init pond
+        let inner = PondInner {
+            pending: 0,
+            reserve: 0,
+            permanent: 0,
+            treasury: 0,
+            total_shares: 0,
+            strategies: vec_map::empty(),
+        };
         transfer::share_object(
             Pond {
                 id: object::new(ctx),
-                version: 1,
-                pending: 0,
-                reserve: 0,
-                permanent: 0,
-                treasury: 0,
-                total_shares: 0,
-                strategies: vec_map::empty(),
+                inner: versioned::create(VERSION, inner, ctx),
             }
         );
     }
@@ -144,7 +151,7 @@ module goose_bumps::pond {
         let CompoundRequest { total_buck: _, receipts } = comp_req;
         let DepositRequest { amount, balance } = dep_req;
         
-        pond.pending = pond.pending + amount;
+        pond.inner_mut().pending = pond.inner().pending + amount;
 
         let mut nft = goose::create(
             b"Egg",
@@ -199,7 +206,7 @@ module goose_bumps::pond {
         let CompoundRequest { total_buck: _, receipts } = comp_req;
         let WithdrawalRequest { amount, balance } = wit_req;
         
-        pond.pending = pond.pending - amount;
+        pond.inner_mut().pending = pond.inner().pending - amount;
         assert_receipts_match(pond, &receipts);
 
         coin::from_balance(balance, ctx)
@@ -256,10 +263,10 @@ module goose_bumps::pond {
 
         assert_receipts_match(pond, &receipts);
 
-        pond.pending = pond.pending - amount;   
-        pond.reserve = pond.reserve + user_amount;
-        pond.permanent = pond.permanent + permanent_amount;
-        pond.treasury = pond.treasury + treasury_amount;
+        pond.inner_mut().pending = pond.inner().pending - amount;   
+        pond.inner_mut().reserve = pond.inner().reserve + user_amount;
+        pond.inner_mut().permanent = pond.inner().permanent + permanent_amount;
+        pond.inner_mut().treasury = pond.inner().treasury + treasury_amount;
         duck_manager.cap().mint(accrued_duck, ctx)
     }
     
@@ -277,7 +284,7 @@ module goose_bumps::pond {
         compound_buckets(pond, total_buck);
         let amount = math64::mul_div_down(
             coin.value(), 
-            pond.reserve, 
+            pond.inner().reserve, 
             duck_manager.supply()
         );
         duck_manager.cap().burn(coin);
@@ -299,7 +306,7 @@ module goose_bumps::pond {
         let WithdrawalRequest { amount, balance } = wit_req;
 
         assert_receipts_match(pond, &receipts);
-        pond.reserve = pond.reserve - amount;
+        pond.inner_mut().reserve = pond.inner().reserve - amount;
         
         coin::from_balance(balance, ctx)
     }
@@ -338,16 +345,16 @@ module goose_bumps::pond {
         amount: u64,
     ) {
         assert!(
-            !pond.strategies.contains(&module_name),
+            !pond.inner().strategies.contains(&module_name),
             EStrategyAlreadyImplemented
         );
 
-        pond.total_shares = pond.total_shares + shares;
-        pond.permanent = pond.permanent + amount;
+        pond.inner_mut().total_shares = pond.inner().total_shares + shares;
+        pond.inner_mut().permanent = pond.inner().permanent + amount;
         strategy.shares = shares;
         strategy.amount = amount;
 
-        pond.strategies.insert(
+        pond.inner_mut().strategies.insert(
             module_name, 
             strategy,
         );
@@ -358,11 +365,11 @@ module goose_bumps::pond {
         module_name: String, 
     ): &mut Strategy {
         assert!(
-            vec_map::contains(&pond.strategies, &module_name),
+            vec_map::contains(&pond.inner().strategies, &module_name),
             EStrategyDoesntExist
         );
 
-        pond.strategies.get_mut(&module_name)
+        pond.inner_mut().strategies.get_mut(&module_name)
     }
 
     public(package) fun take_position<Position: key + store>(
@@ -397,13 +404,13 @@ module goose_bumps::pond {
     ): Balance<BUCK> {
         let balance = dep_req.balance.value();
 
-        if (comp_req.receipts.size() == pond.strategies.size() - 1) {
+        if (comp_req.receipts.size() == pond.inner().strategies.size() - 1) {
             // if it is the last module, we take the rest
             return dep_req.balance.split(balance)
         };
 
-        let strategy = pond.strategies.get(&module_name);
-        let balance_due = math64::mul_div_up(dep_req.amount, strategy.shares, pond.total_shares);
+        let strategy = pond.inner().strategies.get(&module_name);
+        let balance_due = math64::mul_div_up(dep_req.amount, strategy.shares, pond.inner().total_shares);
         dep_req.balance.split(balance_due)
     }
 
@@ -414,19 +421,19 @@ module goose_bumps::pond {
         module_name: String, 
     ): u64 {
 
-        let strategy_idx = pond.strategies.get_idx(&module_name);
+        let strategy_idx = pond.inner().strategies.get_idx(&module_name);
         let mut amount_in_lower_strategies = 0;
-        let mut i = pond.strategies.size() - 1;
+        let mut i = pond.inner().strategies.size() - 1;
         // we get all available funds from lower ranked strategies
         while (i > strategy_idx) {
-            let (_, strategy) = pond.strategies.get_entry_by_idx(i);
+            let (_, strategy) = pond.inner().strategies.get_entry_by_idx(i);
             amount_in_lower_strategies = amount_in_lower_strategies + strategy.amount;
 
             i = i - 1;
         };
         // if there's not enough in lower strategies, we need to get amount from this one
         if (amount_in_lower_strategies < request.amount) {
-            let this_strategy = pond.strategies.get(&module_name);
+            let this_strategy = pond.inner().strategies.get(&module_name);
             // if this one doesn't have enough we take everything
             if (this_strategy.amount < request.amount) return this_strategy.amount;
             // if this one has enough, we return the amount requested
@@ -497,6 +504,14 @@ module goose_bumps::pond {
     //     type_name.get_module()
     // }
 
+    fun inner(pond: &Pond): &PondInner {
+        pond.inner.load_value()
+    }
+
+    fun inner_mut(pond: &mut Pond): &mut PondInner {
+        pond.inner.load_value_mut()
+    }
+
     // TODO: add public for voting
     fun sort_strategies_by_shares(strategies: &mut VecMap<String, Strategy>) {
         let len = strategies.size();
@@ -522,7 +537,7 @@ module goose_bumps::pond {
     }
 
     fun assert_receipts_match(pond: &Pond, receipts: &VecSet<String>) {
-        let mut keys = pond.strategies.keys();
+        let mut keys = pond.inner().strategies.keys();
         while (keys.length() != 0) {
             assert!(
                 receipts.contains(&keys.pop_back()), 
@@ -534,15 +549,16 @@ module goose_bumps::pond {
     // reserve captures yield from all except Treasury 
     // (incentivizes team to not withdraw and lower the fee)
     fun compound_buckets(pond: &mut Pond, total_buck: u64) {
-        let prev_buck = pond.pending + pond.reserve + pond.permanent + pond.treasury;
-        pond.treasury = math64::mul_div_down(pond.treasury, total_buck, prev_buck);
-        pond.reserve = total_buck - pond.pending - pond.permanent - pond.treasury;
+        let inner = pond.inner_mut();
+        let prev_buck = inner.pending + inner.reserve + inner.permanent + inner.treasury;
+        inner.treasury = math64::mul_div_down(inner.treasury, total_buck, prev_buck);
+        inner.reserve = total_buck - inner.pending - inner.permanent - inner.treasury;
     }
 
     fun reserve_buck_supply_duck_ratio(pond: &Pond, duck_manager: &DuckManager): u64 {
         // TODO: handle supply duck = 0 case
         if (duck_manager.supply() != 0) {
-            return math64::mul_div_down(pond.reserve, MUL, duck_manager.supply())
+            return math64::mul_div_down(pond.inner().reserve, MUL, duck_manager.supply())
         };
 
         1 * MUL
@@ -564,11 +580,11 @@ module goose_bumps::pond {
         treasury: u64,
         total_shares: u64,
     ) {
-        assert!(pending == pond.pending, 100);
-        assert!(reserve == pond.reserve, 101);
-        assert!(permanent == pond.permanent, 102);
-        assert!(treasury == pond.treasury, 103);
-        assert!(total_shares == pond.total_shares, 104);
+        assert!(pending == pond.inner().pending, 100);
+        assert!(reserve == pond.inner().reserve, 101);
+        assert!(permanent == pond.inner().permanent, 102);
+        assert!(treasury == pond.inner().treasury, 103);
+        assert!(total_shares == pond.inner().total_shares, 104);
     }
 
     #[test_only]
@@ -578,7 +594,7 @@ module goose_bumps::pond {
         shares: u64,
         amount: u64,
     ) {
-        let strat = pond.strategies.get(&module_name);
+        let strat = pond.inner().strategies.get(&module_name);
         assert!(shares == strat.shares, 105);
         assert!(amount == strat.amount, 106);
     }
