@@ -235,8 +235,8 @@ module goose_bumps::pond {
         compound_buckets(pond, total_buck);
 
         let fee = amount * PUMP_FEE / MUL; // permanent + treasury
-        let treasury_amount = fee * 2 / 5;
-        let permanent_amount = fee - treasury_amount;
+        let treasury_amount = fee * 2 / 5; // 2%
+        let permanent_amount = fee - treasury_amount; // 3%
         let user_amount = amount - fee;
 
         let egg_age = (clock.timestamp_ms() - timestamp) * MUL;
@@ -250,8 +250,8 @@ module goose_bumps::pond {
         // this amount is capped at user_amount / ratio
         let accrued_duck = math64::mul_div_down(
             user_amount, 
-            accrual_param, 
-            ratio
+            accrual_param, // scaled with MUL
+            ratio // scaled with MUL
         );
 
         assert_receipts_match(pond, &receipts);
@@ -275,7 +275,11 @@ module goose_bumps::pond {
         assert_receipts_match(pond, &receipts);
 
         compound_buckets(pond, total_buck);
-        let amount = coin.value() * pond.reserve / duck_manager.supply();
+        let amount = math64::mul_div_down(
+            coin.value(), 
+            pond.reserve, 
+            duck_manager.supply()
+        );
         duck_manager.cap().burn(coin);
 
         (
@@ -531,14 +535,14 @@ module goose_bumps::pond {
     // (incentivizes team to not withdraw and lower the fee)
     fun compound_buckets(pond: &mut Pond, total_buck: u64) {
         let prev_buck = pond.pending + pond.reserve + pond.permanent + pond.treasury;
-        pond.treasury = pond.treasury * total_buck / prev_buck;
+        pond.treasury = math64::mul_div_down(pond.treasury, total_buck, prev_buck);
         pond.reserve = total_buck - pond.pending - pond.permanent - pond.treasury;
     }
 
     fun reserve_buck_supply_duck_ratio(pond: &Pond, duck_manager: &DuckManager): u64 {
         // TODO: handle supply duck = 0 case
         if (duck_manager.supply() != 0) {
-            return pond.reserve * MUL / duck_manager.supply()
+            return math64::mul_div_down(pond.reserve, MUL, duck_manager.supply())
         };
 
         1 * MUL

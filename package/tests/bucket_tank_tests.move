@@ -1,5 +1,6 @@
 #[test_only]
 module goose_bumps::bucket_tank_tests{
+    use std::debug::print;
     use std::ascii::{Self, String};
     use sui::test_scenario::{Self as ts, Scenario};
     use sui::test_utils as tu;
@@ -32,12 +33,26 @@ module goose_bumps::bucket_tank_tests{
         bo: BucketOracle,
     }
 
+    // === helpers ===
+
     fun buck(amount: u64, scen: &mut Scenario): Coin<BUCK> {
         coin::mint_for_testing<BUCK>(amount, scen.ctx())
     }
 
     fun module_name(): String {
         ascii::string(b"sui_tank")
+    }
+
+    fun pump_fee(amount: u64): u64 {
+        amount * PUMP_FEE / MUL
+    }
+
+    fun permanent_fee(amount: u64): u64 {
+        pump_fee(amount) * 3 / 5
+    }
+
+    fun treasury_fee(amount: u64): u64 {
+        pump_fee(amount) * 2 / 5
     }
 
     fun start_world(): World {
@@ -59,7 +74,7 @@ module goose_bumps::bucket_tank_tests{
 
         // get shared objects for world
         let clock = scen.take_shared<Clock>();
-        let mut dm = scen.take_shared<DuckManager>();
+        let dm = scen.take_shared<DuckManager>();
         let mut pond = scen.take_shared<Pond>();
         let mut bp = scen.take_shared<BucketProtocol>();
         let bt = scen.take_shared<BktTreasury>();
@@ -70,35 +85,12 @@ module goose_bumps::bucket_tank_tests{
             module_name(), 
             &mut pond, 
             &mut bp, 
-            buck(1, scen), 
+            buck(1, scen), // we deposit 1 buck
             scen.ctx()
         );
-        dm.init_manager_for_testing(&clock, 0, 0, 0, 0); // TODO see if necessary
 
         World {scenario, pond, bp, bo, clock, bt, dm}
     }
-
-    // fun forward_scenario(scen: &mut Scenario, world: World, user: address): World {
-    //     let World { pond, bp, bo, clock, bt, dm } = world;
-
-    //     ts::return_shared(clock);
-    //     ts::return_shared(pond);
-    //     ts::return_shared(dm);
-    //     ts::return_shared(bp);
-    //     ts::return_shared(bt);
-    //     ts::return_shared(bo);
-
-    //     scen.next_tx(user);
-
-    //     let clock = scen.take_shared<Clock>();
-    //     let mut dm = scen.take_shared<DuckManager>();
-    //     let mut pond = scen.take_shared<Pond>();
-    //     let mut bp = scen.take_shared<BucketProtocol>();
-    //     let bt = scen.take_shared<BktTreasury>();
-    //     let bo = scen.take_shared<BucketOracle>();
-
-    //     World {pond, bp, bo, clock, bt, dm}
-    // }
 
     fun end_world(world: World) {
         let World { scenario, pond, bp, bo, clock, bt, dm } = world;
@@ -112,6 +104,8 @@ module goose_bumps::bucket_tank_tests{
         
         scenario.end();
     }
+
+    // === PTBs ===
 
     fun create_egg(world: &mut World, amount: u64): Goose {
         // create egg: init request
@@ -213,11 +207,7 @@ module goose_bumps::bucket_tank_tests{
         )
     }
 
-    fun pump_fee(amount: u64): u64 {
-        amount * PUMP_FEE / MUL
-    }
-
-    // === test normal operations === 
+    // === tests === 
 
     #[test]
     fun publish_package() {
@@ -265,7 +255,7 @@ module goose_bumps::bucket_tank_tests{
         let duck = pump_egg(&mut world, &mut egg);
 
         tu::assert_eq(duck.value(), 0);
-        world.pond.assert_pond_data(0, 950, 46, 5, 1);
+        world.pond.assert_pond_data(0, 950, 31, 20, 1);
         world.pond.assert_strategy_data(module_name(), 1, 1001);
         pond::assert_no_deposit(&mut egg);
 
@@ -282,8 +272,8 @@ module goose_bumps::bucket_tank_tests{
         // goose pumps
         world.clock.increment_for_testing(10);
         let duck = pump_egg(&mut world, &mut egg);
-        tu::assert_eq(duck.value(), 949); // with accrual_param = 1000000
-        world.pond.assert_pond_data(0, 950, 46, 5, 1);
+        tu::assert_eq(duck.value(), 950);
+        world.pond.assert_pond_data(0, 950, 31, 20, 1);
         world.pond.assert_strategy_data(module_name(), 1, 1001);
         pond::assert_no_deposit(&mut egg);
 
@@ -310,8 +300,8 @@ module goose_bumps::bucket_tank_tests{
             &world.pond, 
             0, 
             0, 
-            pump_fee(amount) - (pump_fee(amount) / 10) + 1, // + init_strat 
-            pump_fee(amount) / 10, 
+            permanent_fee(amount) + 1, // + init_strat 
+            treasury_fee(amount), 
             1
         );
         pond::assert_strategy_data(

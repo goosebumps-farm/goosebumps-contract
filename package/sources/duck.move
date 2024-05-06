@@ -11,15 +11,6 @@ module goose_bumps::duck {
     public struct DuckManager has key {
         id: UID,
         cap: TreasuryCap<DUCK>,
-        reserve: u64,
-        publish_timestamp: u64,
-        average_start_time: u64,
-        target_average_age: u64,
-        adjustment_period_ms: u64,
-        last_period_adjusted: u64,
-        adjustment_mul: u64,
-        min_accrual_param: u64,
-        accrual_param: u64,
     } 
 
     #[allow(lint(share_owned))]
@@ -42,33 +33,7 @@ module goose_bumps::duck {
         transfer::share_object(DuckManager {
             id: object::new(ctx),
             cap,
-            reserve: 0,
-            publish_timestamp: 0,
-            average_start_time: 0,
-            target_average_age: 0,
-            adjustment_period_ms: 0,
-            last_period_adjusted: 0,
-            adjustment_mul: 0,
-            min_accrual_param: 0,
-            accrual_param: 0,
         });
-    }
-
-    // TODO: admin only + guard
-    // called only once
-    entry fun init_duck_manager(
-        manager: &mut DuckManager,
-        clock: &Clock, 
-        target_average_age: u64,
-        adjustment_period_ms: u64,
-        adjustment_mul: u64,
-        min_accrual_param: u64,
-    ) {
-        manager.publish_timestamp = clock.timestamp_ms();
-        manager.target_average_age = target_average_age;
-        manager.adjustment_period_ms = adjustment_period_ms;
-        manager.adjustment_mul = adjustment_mul;
-        manager.min_accrual_param = min_accrual_param;
     }
 
     // === Friend functions ===
@@ -97,11 +62,6 @@ module goose_bumps::duck {
         coin: Coin<DUCK>
     ) {
         treasury_cap.burn(coin);
-    }
-
-    public(package) fun current_period(manager: &DuckManager, clock: &Clock): u64 {
-        let duration = clock.timestamp_ms() - manager.publish_timestamp;
-        duration / manager.adjustment_period_ms
     }
 
     // === Admin only ===
@@ -141,24 +101,5 @@ module goose_bumps::duck {
     #[test_only]
     public fun init_for_testing(ctx: &mut TxContext) {
         init(DUCK {}, ctx);
-    }
-
-    #[test_only]
-    public fun init_manager_for_testing(
-        manager: &mut DuckManager,
-        clock: &Clock, 
-        target_average_age: u64,
-        adjustment_period_ms: u64,
-        adjustment_mul: u64,
-        min_accrual_param: u64,
-    ) {
-        init_duck_manager(
-            manager,
-            clock,
-            target_average_age,
-            adjustment_period_ms,
-            adjustment_mul,
-            min_accrual_param,
-        );
     }
 }
