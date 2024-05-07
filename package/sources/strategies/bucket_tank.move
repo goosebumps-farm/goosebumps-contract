@@ -113,9 +113,9 @@ module goose_bumps::bucket_tank {
         ctx: &mut TxContext
     ): Balance<BUCK> {
         let token: ContributorToken<BUCK, CoinType> = strategy.take_position();
-        let (buck, sui, bkt) = bp.tank_withdraw<CoinType>(oracle, clock, bt, token, ctx);
+        let (buck, coin, bkt) = bp.tank_withdraw<CoinType>(oracle, clock, bt, token, ctx);
         // TODO: to remove and add HPP for swapping 
-        transfer::public_transfer(coin::from_balance(sui, ctx), @0xfcd5f2eee4ca6d81d49c85a1669503b7fc8e641b406fe7cdb696a67ef861492c);
+        transfer::public_transfer(coin::from_balance(coin, ctx), @0xfcd5f2eee4ca6d81d49c85a1669503b7fc8e641b406fe7cdb696a67ef861492c);
         // TODO: to remove and replace 
         bkt.destroy_zero();
 
