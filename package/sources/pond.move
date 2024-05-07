@@ -36,6 +36,8 @@ module goose_bumps::pond {
     const ENotEgg: u64 = 7;
     const EZeroCoin: u64 = 8;
     const ENotEnoughTreasury: u64 = 9;
+    const EWrongVersion: u64 = 10;  
+    const EHatchingNotStarted: u64 = 11;
 
     // === Structs ===
 
@@ -82,6 +84,8 @@ module goose_bumps::pond {
     }
 
     public struct PondInner has store {
+        // epoch when pumps dumps are enabled
+        hatching_start: u64,
         // pending or bonding amount 
         pending: u64,
         // redeemable supply
@@ -132,6 +136,7 @@ module goose_bumps::pond {
     fun init(ctx: &mut TxContext) {
         // init pond
         let inner = PondInner {
+            hatching_start: ctx.epoch() + 7, // 1 week
             pending: 0,
             reserve: 0,
             permanent: 0,
@@ -173,6 +178,8 @@ module goose_bumps::pond {
         dep_req: DepositRequest, 
         ctx: &mut TxContext,
     ): Goose {
+        pond.assert_latest_version();
+
         let CompoundRequest { total_buck: _, receipts } = comp_req;
         let DepositRequest { amount, balance } = dep_req;
         
@@ -230,6 +237,9 @@ module goose_bumps::pond {
         wit_req: WithdrawalRequest, 
         ctx: &mut TxContext
     ): Coin<BUCK> {
+        pond.assert_latest_version();
+        pond.assert_hatching_started(ctx);
+
         let CompoundRequest { total_buck: _, receipts } = comp_req;
         let WithdrawalRequest { amount, balance } = wit_req;
         
@@ -255,6 +265,8 @@ module goose_bumps::pond {
         comp_req: CompoundRequest,
         ctx: &mut TxContext
     ): Coin<DUCK> {
+        pond.assert_latest_version();
+        pond.assert_hatching_started(ctx);
         assert!(nft.status() == 1, ENotEgg);
         
         let Deposit { amount, timestamp } = df::remove(nft.uid_mut(), DepositKey {});
@@ -342,6 +354,8 @@ module goose_bumps::pond {
         wit_req: WithdrawalRequest,
         ctx: &mut TxContext
     ): Coin<BUCK> {
+        pond.assert_latest_version();
+
         let CompoundRequest { total_buck: _, receipts } = comp_req;
         let WithdrawalRequest { amount, balance } = wit_req;
 
@@ -578,8 +592,6 @@ module goose_bumps::pond {
 
     // === Admin Functions ===
 
-
-
     // withdraw from team treasury: init request
     public fun request_withdraw_from_treasury(
         pond: &Pond,
@@ -630,6 +642,14 @@ module goose_bumps::pond {
 
     fun inner_mut(pond: &mut Pond): &mut PondInner {
         pond.inner.load_value_mut()
+    }
+
+    fun assert_latest_version(pond: &Pond) {
+        assert!(pond.inner.version() == VERSION, EWrongVersion);
+    }
+
+    fun assert_hatching_started(pond: &Pond, ctx: &mut TxContext) {
+        assert!(ctx.epoch() >= pond.inner().hatching_start, EHatchingNotStarted);
     }
 
     fun assert_receipts_match(pond: &Pond, receipts: &VecSet<String>) {
