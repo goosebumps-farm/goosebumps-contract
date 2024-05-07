@@ -16,6 +16,7 @@ module goose_bumps::pond {
     use goose_bumps::vec_map::{Self, VecMap};
     use goose_bumps::goose::{Self, Goose};
     use goose_bumps::duck::{DuckManager, DUCK};
+    use goose_bumps::admin::AdminCap;
 
     // === Constants ===
 
@@ -34,6 +35,7 @@ module goose_bumps::pond {
     const ERequestDoesntMatch: u64 = 6;
     const ENotEgg: u64 = 7;
     const EZeroCoin: u64 = 8;
+    const ENotEnoughTreasury: u64 = 9;
 
     // === Structs ===
 
@@ -575,6 +577,39 @@ module goose_bumps::pond {
     } 
 
     // === Admin Functions ===
+
+
+
+    // withdraw from team treasury: init request
+    public fun request_withdraw_from_treasury(
+        pond: &Pond,
+        _: &AdminCap,
+        amount: u64,
+    ): (CompoundRequest, WithdrawalRequest) {
+        assert!(pond.inner().treasury >= amount, ENotEnoughTreasury);
+
+        (
+            CompoundRequest { total_buck: 0, receipts: vec_set::empty() },
+            WithdrawalRequest { amount, balance: balance::zero() }
+        )
+    }
+
+    // withdraw from team treasury: validate request
+    public fun withdraw_from_treasury(
+        pond: &mut Pond, 
+        _: &AdminCap,
+        comp_req: CompoundRequest, 
+        wit_req: WithdrawalRequest, 
+        ctx: &mut TxContext
+    ): Coin<BUCK> {
+        let CompoundRequest { total_buck: _, receipts } = comp_req;
+        let WithdrawalRequest { amount, balance } = wit_req;
+        
+        pond.inner_mut().treasury = pond.inner().treasury - amount;
+        assert_receipts_match(pond, &receipts);
+
+        coin::from_balance(balance, ctx)
+    }
 
     // === Private Functions ===
 
