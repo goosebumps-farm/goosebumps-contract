@@ -47,6 +47,8 @@ Users interact with the protocol in one click, but within a PTB a lot of operati
 
 **redeem**: exchange DUCK for the corresponding BUCK amount. After calling `request_compound()`, the user calls `request_redeem()`, calculating the amount of BUCK to be returned and issuing a new `CompoundRequest` as well as a `WithdrawRequest`. Then the process is the same as for *dump*. At the end `redeem()` is called, DUCK is burnt and BUCK is sent to the user.
 
+![Goose Bumps architecture](./assets/goosebumps_techgraph.png)
+
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
